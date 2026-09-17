@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./features/auth/AuthContext";
@@ -9,14 +10,32 @@ import { ReservarPage } from "./pages/ReservarPage";
 import { LoginPage } from "./pages/LoginPage";
 import { AdminPage } from "./pages/AdminPage";
 
+const LOADING_KEY = "huaman_loading_visto";
+
 function App() {
-  const [cargando, setCargando] = useState(true);
+  const [cargando, setCargando] = useState(() => {
+    try {
+      return sessionStorage.getItem(LOADING_KEY) !== "true";
+    } catch {
+      return true;
+    }
+  });
+
+  const terminarLoading = () => {
+    try {
+      sessionStorage.setItem(LOADING_KEY, "true");
+    } catch {
+      // Si sessionStorage no está disponible, simplemente continuamos.
+    }
+
+    setCargando(false);
+  };
 
   return (
     <ToastProvider>
       <AuthProvider>
         {cargando && (
-          <LoadingScreen onFinish={() => setCargando(false)} />
+          <LoadingScreen onFinish={terminarLoading} />
         )}
 
         <Routes>

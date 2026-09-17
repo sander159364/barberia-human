@@ -58,7 +58,6 @@ export function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-transparent text-blanco outline-none"
-                placeholder="admin@huamanbarber.com"
               />
             </div>
           </div>
