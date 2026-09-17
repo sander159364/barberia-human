@@ -1,0 +1,62 @@
+@theme {
+  /* Paleta oficial del manual de marca */
+  --color-negro: #000000;
+  --color-blanco: #ffffff;
+  --color-amarillo: #ffd800;
+  --color-criss: #aaaaaa;
+
+  /* Tonos de apoyo (no están en el manual, dan profundidad sobre negro) */
+  --color-carbon: #141414;
+  --color-carbon-2: #1f1f1f;
+
+  /* Tipografía */
+  --font-display: "Anton", "Arial Narrow", sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+}
+
+@keyframes scaleIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  0% {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Tema invertido solo para el panel administrador */
+.admin-theme {
+  --color-negro: #ffffff;
+  --color-blanco: #000000;
+  --color-carbon: #f5f5f5;
+  --color-carbon-2: #e0e0e0;
+  --color-criss: #555555;
+  /* el amarillo se mantiene igual, sigue siendo el acento */
+}
+
+/* Puntas redondeadas solo en botones e inputs del panel admin */
+.admin-theme button {
+  border-radius: 9999px;
+}
+
+.admin-theme input,
+.admin-theme select,
+.admin-theme textarea {
+  border-radius: 0.75rem;
+}
+.admin-theme {
+  --font-display: "Plus Jakarta Sans", "Arial Narrow", sans-serif;
+  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+}
