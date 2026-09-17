@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Minus, ShoppingCart, Pencil, Trash2, RefreshCw, Coffee, X, Package } from "lucide-react";
+import { Plus, Minus, ShoppingCart, Pencil, Trash2, RefreshCw, Coffee, Package } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
 import { Modal } from "../../components/ui/Modal";

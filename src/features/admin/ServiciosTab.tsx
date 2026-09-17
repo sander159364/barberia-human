@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { Plus, Trash2, Clock, ImagePlus, Loader2, Pencil, Search, Scissors, X, Power } from "lucide-react";
+import { Plus, Trash2, Clock, ImagePlus, Loader2, Pencil, Search, Scissors, Power } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";

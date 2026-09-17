@@ -10,7 +10,6 @@ import { ConfiguracionTab } from "../features/admin/ConfiguracionTab";
 import { BotonNotificaciones } from "../components/ui/BotonNotificaciones";
 import { BotonInstalarApp } from "../components/ui/BotonInstalarApp";
 
-
 type Tab = "reservas" | "servicios" | "horarios" | "cafeteria" | "caja" | "configuracion";
 
 const TABS: { id: Tab; label: string; icono: React.ReactNode }[] = [
