@@ -305,6 +305,7 @@ export interface BarberoDB {
   nombre: string;
   activo: boolean;
   orden: number;
+  imagen_url: string | null;
 }
 
 export interface HorarioBarberoDB {
@@ -322,18 +323,40 @@ export async function fetchBarberos() {
   return data as BarberoDB[];
 }
 
-export async function crearBarbero(token: string, nombre: string) {
-  const { data, error } = await supabase.rpc("crear_barbero", { p_token: token, p_nombre: nombre });
+export async function subirImagenBarbero(file: File): Promise<string> {
+  const extension = file.name.split(".").pop();
+  const nombreArchivo = `${crypto.randomUUID()}.${extension}`;
+
+  const { error } = await supabase.storage
+    .from("barberos")
+    .upload(nombreArchivo, file, { upsert: false });
+
+  if (error) throw error;
+
+  const { data } = supabase.storage.from("barberos").getPublicUrl(nombreArchivo);
+  return data.publicUrl;
+}
+
+export async function crearBarbero(token: string, nombre: string, imagenUrl?: string | null) {
+  const { data, error } = await supabase.rpc("crear_barbero", {
+    p_token: token,
+    p_nombre: nombre,
+    p_imagen_url: imagenUrl ?? null,
+  });
   if (error) throw error;
   return data as BarberoDB;
 }
 
-export async function actualizarBarbero(token: string, barbero: { id: string; nombre: string; activo: boolean }) {
+export async function actualizarBarbero(
+  token: string,
+  barbero: { id: string; nombre: string; activo: boolean; imagen_url?: string | null }
+) {
   const { error } = await supabase.rpc("actualizar_barbero", {
     p_token: token,
     p_id: barbero.id,
     p_nombre: barbero.nombre,
     p_activo: barbero.activo,
+    p_imagen_url: barbero.imagen_url ?? null,
   });
   if (error) throw error;
 }

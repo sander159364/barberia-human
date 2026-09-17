@@ -1,16 +1,29 @@
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Trash2, Pencil, Clock, Scissors, RefreshCw, CalendarOff, CalendarCheck2 } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  Clock,
+  Scissors,
+  RefreshCw,
+  CalendarOff,
+  CalendarCheck2,
+  Loader2,
+  ImagePlus,
+} from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { useToast } from "../../components/ui/Toast";
+import { ImagenConCarga } from "../../components/ui/ImagenConCarga";
 import {
   fetchBarberos,
   crearBarbero,
   actualizarBarbero,
   eliminarBarbero,
+  subirImagenBarbero,
   fetchServicios,
   fetchServiciosDeBarbero,
   actualizarServiciosBarbero,
@@ -62,62 +75,62 @@ function Interruptor({ activo, onCambiar }: { activo: boolean; onCambiar: () => 
   );
 }
 
-function SelectorHoraAmPm({
-  valor,
-  disabled,
-  onCambiar,
+// ============================================================
+// Selector de foto del barbero (mismo patrón que Servicios)
+// ============================================================
+function SelectorFotoBarbero({
+  urlActual,
+  onSubido,
 }: {
-  valor: string | null;
-  disabled?: boolean;
-  onCambiar: (valor24h: string) => void;
+  urlActual: string | null;
+  onSubido: (url: string) => void;
 }) {
-  const { hora, minuto, meridiano } = parseHora(valor);
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function actualizar(campos: Partial<{ hora: number; minuto: number; meridiano: "AM" | "PM" }>) {
-    onCambiar(formatearHora24(campos.hora ?? hora, campos.minuto ?? minuto, campos.meridiano ?? meridiano));
+  async function manejarArchivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Solo se permiten imágenes.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("La imagen debe pesar menos de 5MB.");
+      return;
+    }
+
+    setError(null);
+    setSubiendo(true);
+    try {
+      const url = await subirImagenBarbero(file);
+      onSubido(url);
+    } catch {
+      setError("No se pudo subir la imagen.");
+    } finally {
+      setSubiendo(false);
+    }
   }
 
   return (
-    <div className="grid grid-cols-3 gap-1.5">
-      <select
-        value={hora}
-        disabled={disabled}
-        onChange={(e) => actualizar({ hora: Number(e.target.value) })}
-        className="w-full rounded-lg border-2 border-carbon-2 bg-negro px-2 py-2.5 font-body text-sm font-bold text-blanco outline-none focus:border-amarillo disabled:opacity-30"
-      >
-        {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
-          <option key={h} value={h}>
-            {h}
-          </option>
-        ))}
-      </select>
-      <select
-        value={minuto}
-        disabled={disabled}
-        onChange={(e) => actualizar({ minuto: Number(e.target.value) })}
-        className="w-full rounded-lg border-2 border-carbon-2 bg-negro px-2 py-2.5 font-body text-sm font-bold text-blanco outline-none focus:border-amarillo disabled:opacity-30"
-      >
-        {[0, 15, 30, 45].map((m) => (
-          <option key={m} value={m}>
-            {String(m).padStart(2, "0")}
-          </option>
-        ))}
-      </select>
-      <div className="flex overflow-hidden rounded-lg border-2 border-carbon-2">
-        {(["AM", "PM"] as const).map((mer) => (
-          <button
-            key={mer}
-            type="button"
-            disabled={disabled}
-            onClick={() => actualizar({ meridiano: mer })}
-            className={`flex-1 py-2.5 font-body text-xs font-black transition-colors disabled:opacity-30 ${
-              meridiano === mer ? "bg-amarillo text-negro" : "bg-negro text-criss"
-            }`}
-          >
-            {mer}
-          </button>
-        ))}
+    <div>
+      <div className="flex items-center gap-3">
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-carbon-2 bg-negro">
+          {subiendo ? (
+            <Loader2 size={22} className="animate-spin text-amarillo" />
+          ) : urlActual ? (
+            <img src={urlActual} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <ImagePlus size={22} className="text-criss" />
+          )}
+        </div>
+        <label className="cursor-pointer rounded-lg border-2 border-carbon-2 px-4 py-2.5 font-body text-xs font-bold uppercase tracking-wide text-blanco transition-colors hover:border-amarillo hover:text-amarillo">
+          {urlActual ? "Cambiar foto" : "Subir foto"}
+          <input type="file" accept="image/*" onChange={manejarArchivo} className="hidden" disabled={subiendo} />
+        </label>
       </div>
+      {error && <p className="mt-2 font-body text-xs font-bold text-red-500">{error}</p>}
     </div>
   );
 }
@@ -136,6 +149,7 @@ export function HorariosTab() {
 
   const [modalNuevo, setModalNuevo] = useState(false);
   const [nombreNuevo, setNombreNuevo] = useState("");
+  const [fotoNueva, setFotoNueva] = useState<string | null>(null);
   const [creando, setCreando] = useState(false);
 
   const cargarBarberos = useCallback(async () => {
@@ -166,14 +180,21 @@ export function HorariosTab() {
     };
   }, [cargarBarberos]);
 
+  function abrirModalNuevo() {
+    setNombreNuevo("");
+    setFotoNueva(null);
+    setModalNuevo(true);
+  }
+
   async function handleCrearBarbero() {
     if (!usuario || !nombreNuevo.trim()) return;
     setCreando(true);
     try {
-      await crearBarbero(usuario.token, nombreNuevo.trim());
+      await crearBarbero(usuario.token, nombreNuevo.trim(), fotoNueva);
       mostrarExito(`"${nombreNuevo.trim()}" fue agregado.`);
       setModalNuevo(false);
       setNombreNuevo("");
+      setFotoNueva(null);
       cargarBarberos();
     } catch {
       mostrarError("No se pudo crear el barbero.");
@@ -193,7 +214,7 @@ export function HorariosTab() {
           </h2>
           <p className="font-body text-xs text-criss">Un solo rango de "desde" y "hasta" por día.</p>
         </div>
-        <Button className="!px-5 !py-2.5 gap-2 text-sm font-bold" onClick={() => setModalNuevo(true)}>
+        <Button className="!px-5 !py-2.5 gap-2 text-sm font-bold" onClick={abrirModalNuevo}>
           <Plus size={18} strokeWidth={3} /> Nuevo barbero
         </Button>
       </div>
@@ -222,13 +243,14 @@ export function HorariosTab() {
                     : "border-carbon-2 bg-carbon-1 hover:border-criss"
                 }`}
               >
-                <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                    barberoActivoId === b.id ? "bg-amarillo text-negro" : "bg-carbon-2 text-criss"
+                <ImagenConCarga
+                  url={b.imagen_url}
+                  alt={b.nombre}
+                  icono={<Scissors size={16} />}
+                  className={`h-10 w-10 rounded-full ${
+                    barberoActivoId === b.id ? "ring-2 ring-amarillo" : ""
                   }`}
-                >
-                  <Scissors size={16} />
-                </div>
+                />
                 <span
                   className={`text-center font-body text-xs font-bold ${
                     barberoActivoId === b.id ? "text-blanco" : "text-criss"
@@ -252,6 +274,9 @@ export function HorariosTab() {
       )}
 
       <Modal abierto={modalNuevo} onCerrar={() => setModalNuevo(false)} titulo="Nuevo barbero" ancho="sm">
+        <div className="mb-4">
+          <SelectorFotoBarbero urlActual={fotoNueva} onSubido={setFotoNueva} />
+        </div>
         <label className="mb-1 block font-body text-xs font-bold uppercase tracking-wide text-criss">Nombre</label>
         <input
           type="text"
@@ -328,11 +353,13 @@ function PanelBarbero({ barbero, onCambiado }: { barbero: BarberoDB; onCambiado:
   const [modalEditar, setModalEditar] = useState(false);
   const [nombreEdit, setNombreEdit] = useState(barbero.nombre);
   const [activoEdit, setActivoEdit] = useState(barbero.activo);
+  const [fotoEdit, setFotoEdit] = useState<string | null>(barbero.imagen_url);
   const [guardandoEdit, setGuardandoEdit] = useState(false);
 
   function abrirEditar() {
     setNombreEdit(barbero.nombre);
     setActivoEdit(barbero.activo);
+    setFotoEdit(barbero.imagen_url);
     setModalEditar(true);
   }
 
@@ -340,7 +367,12 @@ function PanelBarbero({ barbero, onCambiado }: { barbero: BarberoDB; onCambiado:
     if (!usuario || !nombreEdit.trim()) return;
     setGuardandoEdit(true);
     try {
-      await actualizarBarbero(usuario.token, { id: barbero.id, nombre: nombreEdit.trim(), activo: activoEdit });
+      await actualizarBarbero(usuario.token, {
+        id: barbero.id,
+        nombre: nombreEdit.trim(),
+        activo: activoEdit,
+        imagen_url: fotoEdit,
+      });
       mostrarExito("Barbero actualizado.");
       setModalEditar(false);
       onCambiado();
@@ -376,13 +408,12 @@ function PanelBarbero({ barbero, onCambiado }: { barbero: BarberoDB; onCambiado:
     <div className="rounded-2xl border-2 border-carbon-2 bg-carbon-1 p-4 sm:p-5">
       <div className="mb-5 flex flex-col gap-4 border-b-2 border-carbon-2 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
-              barbero.activo ? "bg-amarillo text-negro" : "bg-carbon-2 text-criss"
-            }`}
-          >
-            <Scissors size={20} />
-          </div>
+          <ImagenConCarga
+            url={barbero.imagen_url}
+            alt={barbero.nombre}
+            icono={<Scissors size={20} />}
+            className="h-12 w-12 rounded-full"
+          />
           <div>
             <p className="font-display text-lg font-black text-blanco">{barbero.nombre}</p>
             <p className={`font-body text-xs font-bold uppercase ${barbero.activo ? "text-emerald-400" : "text-criss"}`}>
@@ -465,6 +496,9 @@ function PanelBarbero({ barbero, onCambiado }: { barbero: BarberoDB; onCambiado:
 
       {/* Modal: Editar */}
       <Modal abierto={modalEditar} onCerrar={() => setModalEditar(false)} titulo="Editar barbero" ancho="sm">
+        <div className="mb-4">
+          <SelectorFotoBarbero urlActual={fotoEdit} onSubido={setFotoEdit} />
+        </div>
         <label className="mb-1 block font-body text-xs font-bold uppercase tracking-wide text-criss">Nombre</label>
         <input
           type="text"
@@ -668,5 +702,65 @@ function ModalHorarioBarbero({
         </>
       )}
     </Modal>
+  );
+}
+
+function SelectorHoraAmPm({
+  valor,
+  disabled,
+  onCambiar,
+}: {
+  valor: string | null;
+  disabled?: boolean;
+  onCambiar: (valor24h: string) => void;
+}) {
+  const { hora, minuto, meridiano } = parseHora(valor);
+
+  function actualizar(campos: Partial<{ hora: number; minuto: number; meridiano: "AM" | "PM" }>) {
+    onCambiar(formatearHora24(campos.hora ?? hora, campos.minuto ?? minuto, campos.meridiano ?? meridiano));
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-1.5">
+      <select
+        value={hora}
+        disabled={disabled}
+        onChange={(e) => actualizar({ hora: Number(e.target.value) })}
+        className="w-full rounded-lg border-2 border-carbon-2 bg-negro px-2 py-2.5 font-body text-sm font-bold text-blanco outline-none focus:border-amarillo disabled:opacity-30"
+      >
+        {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+          <option key={h} value={h}>
+            {h}
+          </option>
+        ))}
+      </select>
+      <select
+        value={minuto}
+        disabled={disabled}
+        onChange={(e) => actualizar({ minuto: Number(e.target.value) })}
+        className="w-full rounded-lg border-2 border-carbon-2 bg-negro px-2 py-2.5 font-body text-sm font-bold text-blanco outline-none focus:border-amarillo disabled:opacity-30"
+      >
+        {[0, 15, 30, 45].map((m) => (
+          <option key={m} value={m}>
+            {String(m).padStart(2, "0")}
+          </option>
+        ))}
+      </select>
+      <div className="flex overflow-hidden rounded-lg border-2 border-carbon-2">
+        {(["AM", "PM"] as const).map((mer) => (
+          <button
+            key={mer}
+            type="button"
+            disabled={disabled}
+            onClick={() => actualizar({ meridiano: mer })}
+            className={`flex-1 py-2.5 font-body text-xs font-black transition-colors disabled:opacity-30 ${
+              meridiano === mer ? "bg-amarillo text-negro" : "bg-negro text-criss"
+            }`}
+          >
+            {mer}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

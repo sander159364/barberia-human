@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Clock, User, Phone, Timer, Scissors } from "lucide-re
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { Button } from "../components/ui/Button";
+import { ImagenConCarga } from "../components/ui/ImagenConCarga";
 import { supabase } from "../lib/supabaseClient";
 import { obtenerSessionId } from "../lib/sesionCliente";
 import { useServicios } from "../hooks/useServicios";
@@ -283,20 +284,28 @@ export function ReservarPage() {
                           : "border-carbon-2 bg-carbon-1 hover:border-criss hover:-translate-y-0.5"
                       }`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-display text-lg uppercase text-blanco">{s.nombre}</h3>
-                          <p className="mt-1 font-body text-sm text-criss">{s.descripcion}</p>
-                          <div className="mt-2 flex items-center gap-3 font-body text-xs text-criss">
-                            <span className="flex items-center gap-1"><Clock size={12} /> {s.duracion_min} min</span>
-                            <span className="font-semibold text-blanco">S/ {s.precio}</span>
+                      <div className="flex items-start gap-3">
+                        <ImagenConCarga
+                          url={s.imagen_url}
+                          alt={s.nombre}
+                          icono={<Scissors size={18} />}
+                          className="h-14 w-14 rounded-xl"
+                        />
+                        <div className="flex flex-1 items-start justify-between">
+                          <div>
+                            <h3 className="font-display text-lg uppercase text-blanco">{s.nombre}</h3>
+                            <p className="mt-1 font-body text-sm text-criss">{s.descripcion}</p>
+                            <div className="mt-2 flex items-center gap-3 font-body text-xs text-criss">
+                              <span className="flex items-center gap-1"><Clock size={12} /> {s.duracion_min} min</span>
+                              <span className="font-semibold text-blanco">S/ {s.precio}</span>
+                            </div>
                           </div>
+                          {seleccionandoId === s.id && (
+                            <span className="ml-2 flex h-6 w-6 shrink-0 animate-[scaleIn_0.2s_ease-out] items-center justify-center rounded-full bg-amarillo text-negro">
+                              <Check size={14} />
+                            </span>
+                          )}
                         </div>
-                        {seleccionandoId === s.id && (
-                          <span className="flex h-6 w-6 animate-[scaleIn_0.2s_ease-out] items-center justify-center rounded-full bg-amarillo text-negro">
-                            <Check size={14} />
-                          </span>
-                        )}
                       </div>
                     </button>
                   ))}
@@ -336,9 +345,12 @@ export function ReservarPage() {
                           : "border-carbon-2 bg-carbon hover:border-criss hover:-translate-y-0.5"
                       }`}
                     >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-carbon-2 text-blanco">
-                        <Scissors size={16} />
-                      </div>
+                      <ImagenConCarga
+                        url={b.imagen_url}
+                        alt={b.nombre}
+                        icono={<Scissors size={16} className="text-blanco" />}
+                        className="h-10 w-10 rounded-full"
+                      />
                       <span className="font-display text-base text-blanco">{b.nombre}</span>
                       {seleccionandoBarberoId === b.id && (
                         <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-amarillo text-negro">

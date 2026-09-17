@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 export interface Barbero {
   id: string;
   nombre: string;
+  imagen_url: string | null;
 }
 
 export function useBarberos(servicioId: string | null) {
@@ -22,13 +23,13 @@ export function useBarberos(servicioId: string | null) {
 
     const { data, error } = await supabase
       .from("servicios_barberos")
-      .select("barbero_id, barberos!inner(id, nombre, activo)")
+      .select("barbero_id, barberos!inner(id, nombre, imagen_url, activo)")
       .eq("servicio_id", servicioId)
       .eq("barberos.activo", true);
 
     if (!error && data) {
       const lista = data
-        .map((r: any) => r.barberos as { id: string; nombre: string })
+        .map((r: any) => r.barberos as { id: string; nombre: string; imagen_url: string | null })
         .filter(Boolean);
       setBarberos(lista);
     }
