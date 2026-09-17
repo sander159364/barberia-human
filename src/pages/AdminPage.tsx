@@ -8,7 +8,6 @@ import { CafeteriaTab } from "../features/admin/CafeteriaTab";
 import { CajaTab } from "../features/admin/CajaTab";
 import { ConfiguracionTab } from "../features/admin/ConfiguracionTab";
 import { BotonNotificaciones } from "../components/ui/BotonNotificaciones";
-import { BotonInstalarApp } from "../components/ui/BotonInstalarApp";
 
 type Tab = "reservas" | "servicios" | "horarios" | "cafeteria" | "caja" | "configuracion";
 
