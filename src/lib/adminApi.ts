@@ -42,6 +42,8 @@ export interface ProductoCafeteriaDB {
   precio: number;
   activo: boolean;
   orden: number;
+  stock_actual: number;
+  stock_minimo: number;
 }
 
 export interface CajaSesionDB {
@@ -174,13 +176,15 @@ export async function fetchProductosCafeteria() {
 
 export async function crearProductoCafeteria(
   token: string,
-  producto: { nombre: string; descripcion: string; precio: number }
+  producto: { nombre: string; descripcion: string; precio: number; stockActual?: number; stockMinimo?: number }
 ) {
   const { data, error } = await supabase.rpc("crear_producto_cafeteria", {
     p_token: token,
     p_nombre: producto.nombre,
     p_descripcion: producto.descripcion,
     p_precio: producto.precio,
+    p_stock_actual: producto.stockActual ?? 0,
+    p_stock_minimo: producto.stockMinimo ?? 0,
   });
   if (error) throw error;
   return data as ProductoCafeteriaDB;
@@ -194,6 +198,8 @@ export async function actualizarProductoCafeteria(token: string, producto: Produ
     p_descripcion: producto.descripcion,
     p_precio: producto.precio,
     p_activo: producto.activo,
+    p_stock_actual: producto.stock_actual,
+    p_stock_minimo: producto.stock_minimo,
   });
   if (error) throw error;
 }
@@ -428,6 +434,8 @@ export const MODULOS_DISPONIBLES = [
   { id: "servicios", label: "Servicios" },
   { id: "horarios", label: "Barberos y horarios" },
   { id: "cafeteria", label: "Cafetería" },
+  { id: "inventario", label: "Inventario" },
+  { id: "clientes", label: "Clientes" },
   { id: "caja", label: "Caja" },
 ] as const;
 
@@ -515,6 +523,9 @@ export async function fetchMovimientosCajaPorRango(fechaInicio: string, fechaFin
     } as MovimientoExportDB;
   });
 }
+
+// ---------------- PUSH NOTIFICATIONS ----------------
+
 export async function guardarPushSubscription(
   token: string,
   sub: { endpoint: string; p256dh: string; auth: string }
@@ -533,5 +544,108 @@ export async function eliminarPushSubscription(token: string, endpoint: string) 
     p_token: token,
     p_endpoint: endpoint,
   });
+  if (error) throw error;
+}
+
+// ---------------- INVENTARIO: INSUMOS ----------------
+
+export interface InsumoDB {
+  id: string;
+  nombre: string;
+  categoria: string | null;
+  unidad: string;
+  stock_actual: number;
+  stock_minimo: number;
+  activo: boolean;
+  creado_en: string;
+}
+
+export async function fetchInsumos() {
+  const { data, error } = await supabase.from("insumos").select("*").order("nombre");
+  if (error) throw error;
+  return data as InsumoDB[];
+}
+
+export async function crearInsumo(
+  token: string,
+  insumo: { nombre: string; categoria: string; unidad: string; stockActual: number; stockMinimo: number }
+) {
+  const { data, error } = await supabase.rpc("crear_insumo", {
+    p_token: token,
+    p_nombre: insumo.nombre,
+    p_categoria: insumo.categoria || null,
+    p_unidad: insumo.unidad,
+    p_stock_actual: insumo.stockActual,
+    p_stock_minimo: insumo.stockMinimo,
+  });
+  if (error) throw error;
+  return data as InsumoDB;
+}
+
+export async function actualizarInsumo(token: string, insumo: InsumoDB) {
+  const { error } = await supabase.rpc("actualizar_insumo", {
+    p_token: token,
+    p_id: insumo.id,
+    p_nombre: insumo.nombre,
+    p_categoria: insumo.categoria,
+    p_unidad: insumo.unidad,
+    p_stock_actual: insumo.stock_actual,
+    p_stock_minimo: insumo.stock_minimo,
+    p_activo: insumo.activo,
+  });
+  if (error) throw error;
+}
+
+export async function eliminarInsumo(token: string, id: string) {
+  const { error } = await supabase.rpc("eliminar_insumo", { p_token: token, p_id: id });
+  if (error) throw error;
+}
+
+// ---------------- CLIENTES ----------------
+
+export interface ClienteDB {
+  id: string;
+  nombre: string;
+  apellido: string;
+  celular: string | null;
+  fecha_nacimiento: string | null;
+  creado_en: string;
+}
+
+export async function fetchClientes() {
+  const { data, error } = await supabase.from("clientes").select("*").order("nombre");
+  if (error) throw error;
+  return data as ClienteDB[];
+}
+
+export async function crearCliente(
+  token: string,
+  cliente: { nombre: string; apellido: string; celular: string; fechaNacimiento: string | null }
+) {
+  const { data, error } = await supabase.rpc("crear_cliente", {
+    p_token: token,
+    p_nombre: cliente.nombre,
+    p_apellido: cliente.apellido,
+    p_celular: cliente.celular || null,
+    p_fecha_nacimiento: cliente.fechaNacimiento || null,
+  });
+  if (error) throw error;
+  return data as ClienteDB;
+}
+
+export async function actualizarCliente(token: string, cliente: ClienteDB) {
+  const { error } = await supabase.rpc("actualizar_cliente", {
+    p_token: token,
+    p_id: cliente.id,
+    p_nombre: cliente.nombre,
+    p_apellido: cliente.apellido,
+    p_celular: cliente.celular,
+    p_fecha_nacimiento: cliente.fecha_nacimiento,
+  });
+  if (error) throw error;
+}
+
+export async function eliminarCliente(token: string, id: string) {
+  const { error } = await supabase.rpc("eliminar_cliente", { p_token: token, p_id: id });
   if (error) throw error;
 }

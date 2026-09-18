@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Scissors, Clock, Coffee, Wallet, LogOut, PanelLeft, Home, X, Settings } from "lucide-react";
+import { Calendar, Scissors, Clock, Coffee, Wallet, LogOut, PanelLeft, Home, X, Settings, Boxes, Users } from "lucide-react";
 import { useAuth } from "../features/auth/AuthContext";
 import { ReservasTab } from "../features/admin/ReservasTab";
 import { ServiciosTab } from "../features/admin/ServiciosTab";
@@ -7,21 +7,23 @@ import { HorariosTab } from "../features/admin/HorariosTab";
 import { CafeteriaTab } from "../features/admin/CafeteriaTab";
 import { CajaTab } from "../features/admin/CajaTab";
 import { ConfiguracionTab } from "../features/admin/ConfiguracionTab";
+import { InventarioTab } from "../features/admin/InventarioTab";
+import { ClientesTab } from "../features/admin/ClientesTab";
 import { BotonNotificaciones } from "../components/ui/BotonNotificaciones";
 
-type Tab = "reservas" | "servicios" | "horarios" | "cafeteria" | "caja" | "configuracion";
+type Tab = "reservas" | "servicios" | "horarios" | "cafeteria" | "inventario" | "clientes" | "caja" | "configuracion";
 
 const TABS: { id: Tab; label: string; icono: React.ReactNode }[] = [
   { id: "reservas", label: "Reservas", icono: <Calendar size={18} /> },
   { id: "servicios", label: "Servicios", icono: <Scissors size={18} /> },
   { id: "horarios", label: "Horarios", icono: <Clock size={18} /> },
   { id: "cafeteria", label: "Cafetería", icono: <Coffee size={18} /> },
+  { id: "inventario", label: "Inventario", icono: <Boxes size={18} /> },
+  { id: "clientes", label: "Clientes", icono: <Users size={18} /> },
   { id: "caja", label: "Caja", icono: <Wallet size={18} /> },
   { id: "configuracion", label: "Config.", icono: <Settings size={18} /> },
 ];
 
-// Ángulos (en grados) para repartir los botones en semicírculo arriba del FAB móvil.
-// De -170° (casi horizontal izquierda) a -10° (casi horizontal derecha), pasando por arriba.
 function calcularAngulos(cantidad: number) {
   const inicio = -170;
   const fin = -10;
@@ -30,7 +32,7 @@ function calcularAngulos(cantidad: number) {
   return Array.from({ length: cantidad }, (_, i) => inicio + paso * i);
 }
 
-const RADIO_RUEDA = 110; // px
+const RADIO_RUEDA = 110;
 
 export function AdminPage() {
   const { usuario, logout } = useAuth();
@@ -59,7 +61,7 @@ export function AdminPage() {
             Panel administrador
           </div>
 
-          <div className="flex flex-1 flex-col gap-1 px-3">
+          <div className="flex flex-1 flex-col gap-1 overflow-y-auto px-3">
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -90,7 +92,6 @@ export function AdminPage() {
 
       {/* ---------- Rueda de navegación, SOLO MÓVIL ---------- */}
       <div className="lg:hidden">
-        {/* Fondo oscuro al abrir, para cerrar tocando afuera */}
         {menuMovilAbierto && (
           <div
             className="fixed inset-0 z-40 bg-negro/50 backdrop-blur-sm transition-opacity"
@@ -98,7 +99,6 @@ export function AdminPage() {
           />
         )}
 
-        {/* Botones en abanico */}
         <div className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2">
           {TABS.map((t, i) => {
             const angulo = (angulos[i] * Math.PI) / 180;
@@ -125,7 +125,6 @@ export function AdminPage() {
             );
           })}
 
-          {/* Botón "cerrar sesión" dentro de la rueda también */}
           <button
             onClick={() => {
               setMenuMovilAbierto(false);
@@ -146,7 +145,6 @@ export function AdminPage() {
             <LogOut size={16} />
           </button>
 
-          {/* Botón central (casita) */}
           <button
             onClick={() => setMenuMovilAbierto((v) => !v)}
             className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-negro text-blanco shadow-xl transition-transform active:scale-95"
@@ -163,7 +161,6 @@ export function AdminPage() {
             <p className="font-body text-xs text-criss sm:text-sm">Panel administrador</p>
             <h1 className="font-display text-xl text-blanco sm:text-2xl">{tabActivo?.label}</h1>
           </div>
-          {/* Siempre visible: en desktop y en móvil, sin depender del sidebar ni de la rueda */}
           <BotonNotificaciones compacto />
         </div>
       </div>
@@ -173,6 +170,8 @@ export function AdminPage() {
         {tab === "servicios" && <ServiciosTab />}
         {tab === "horarios" && <HorariosTab />}
         {tab === "cafeteria" && <CafeteriaTab />}
+        {tab === "inventario" && <InventarioTab />}
+        {tab === "clientes" && <ClientesTab />}
         {tab === "caja" && <CajaTab />}
         {tab === "configuracion" && <ConfiguracionTab />}
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Minus, ShoppingCart, Pencil, Trash2, RefreshCw, Coffee, Package } from "lucide-react";
+import { Plus, Minus, ShoppingCart, Pencil, Trash2, RefreshCw, Coffee, Package, AlertTriangle } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
 import { Modal } from "../../components/ui/Modal";
@@ -35,6 +35,8 @@ export function CafeteriaTab() {
   const [formNombre, setFormNombre] = useState("");
   const [formDescripcion, setFormDescripcion] = useState("");
   const [formPrecio, setFormPrecio] = useState("");
+  const [formStockActual, setFormStockActual] = useState("0");
+  const [formStockMinimo, setFormStockMinimo] = useState("0");
 
   const cargar = useCallback(async (silencioso = false) => {
     if (silencioso) setActualizando(true);
@@ -113,6 +115,8 @@ export function CafeteriaTab() {
     setFormNombre("");
     setFormDescripcion("");
     setFormPrecio("");
+    setFormStockActual("0");
+    setFormStockMinimo("0");
   }
 
   function abrirModalEditar(p: ProductoCafeteriaDB) {
@@ -120,6 +124,8 @@ export function CafeteriaTab() {
     setFormNombre(p.nombre);
     setFormDescripcion(p.descripcion ?? "");
     setFormPrecio(String(p.precio));
+    setFormStockActual(String(p.stock_actual));
+    setFormStockMinimo(String(p.stock_minimo));
   }
 
   async function handleGuardarProducto() {
@@ -136,6 +142,8 @@ export function CafeteriaTab() {
           nombre: formNombre.trim(),
           descripcion: formDescripcion.trim(),
           precio,
+          stockActual: Number(formStockActual) || 0,
+          stockMinimo: Number(formStockMinimo) || 0,
         });
       } else if (modalProducto) {
         await actualizarProductoCafeteria(usuario.token, {
@@ -143,6 +151,8 @@ export function CafeteriaTab() {
           nombre: formNombre.trim(),
           descripcion: formDescripcion.trim(),
           precio,
+          stock_actual: Number(formStockActual) || 0,
+          stock_minimo: Number(formStockMinimo) || 0,
         });
       }
       setModalProducto(null);
@@ -234,12 +244,13 @@ export function CafeteriaTab() {
               <div className="mb-24 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:mb-0 lg:grid-cols-2 xl:grid-cols-3">
                 {productosActivos.map((p) => {
                   const cantidad = carrito[p.id] ?? 0;
+                  const sinStock = p.stock_actual <= 0;
                   return (
                     <div
                       key={p.id}
                       className={`flex flex-col justify-between rounded-2xl border p-4 transition-colors ${
                         cantidad > 0 ? "border-negro bg-carbon" : "border-carbon-2 bg-carbon"
-                      }`}
+                      } ${sinStock ? "opacity-60" : ""}`}
                     >
                       <div className="mb-3">
                         <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-negro text-blanco">
@@ -248,6 +259,11 @@ export function CafeteriaTab() {
                         <p className="font-display text-sm leading-tight text-blanco">{p.nombre}</p>
                         {p.descripcion && (
                           <p className="mt-0.5 line-clamp-2 font-body text-xs text-criss">{p.descripcion}</p>
+                        )}
+                        {sinStock && (
+                          <p className="mt-1 flex items-center gap-1 font-body text-[10px] font-semibold text-amarillo">
+                            <AlertTriangle size={10} /> Sin stock
+                          </p>
                         )}
                       </div>
 
@@ -377,56 +393,63 @@ export function CafeteriaTab() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {productos.map((p) => (
-                <div
-                  key={p.id}
-                  className={`rounded-2xl border border-carbon-2 bg-carbon p-4 transition-opacity ${
-                    !p.activo && "opacity-50"
-                  }`}
-                >
-                  <div className="mb-3 flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-negro text-blanco">
-                        <Coffee size={16} />
+              {productos.map((p) => {
+                const stockBajo = p.stock_actual <= p.stock_minimo;
+                return (
+                  <div
+                    key={p.id}
+                    className={`rounded-2xl border p-4 transition-opacity ${
+                      stockBajo && p.activo ? "border-amarillo/40 bg-amarillo/5" : "border-carbon-2 bg-carbon"
+                    } ${!p.activo && "opacity-50"}`}
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-negro text-blanco">
+                          <Coffee size={16} />
+                        </div>
+                        <div>
+                          <p className="font-display text-sm leading-tight text-blanco">{p.nombre}</p>
+                          <p className="font-body text-xs text-criss">{p.descripcion}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-display text-sm leading-tight text-blanco">{p.nombre}</p>
-                        <p className="font-body text-xs text-criss">{p.descripcion}</p>
-                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 font-body text-[10px] font-semibold uppercase ${
+                          p.activo ? "bg-emerald-500/15 text-emerald-600" : "bg-carbon-2 text-criss"
+                        }`}
+                      >
+                        {p.activo ? "Activo" : "Inactivo"}
+                      </span>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 font-body text-[10px] font-semibold uppercase ${
-                        p.activo ? "bg-emerald-500/15 text-emerald-600" : "bg-carbon-2 text-criss"
-                      }`}
-                    >
-                      {p.activo ? "Activo" : "Inactivo"}
-                    </span>
-                  </div>
 
-                  <p className="mb-3 font-display text-lg text-blanco">S/ {Number(p.precio).toFixed(2)}</p>
+                    <p className="mb-1 font-display text-lg text-blanco">S/ {Number(p.precio).toFixed(2)}</p>
+                    <p className={`mb-3 flex items-center gap-1 font-body text-xs ${stockBajo ? "font-semibold text-amarillo" : "text-criss"}`}>
+                      {stockBajo && <AlertTriangle size={11} />}
+                      Stock: {p.stock_actual} {stockBajo && `(mín. ${p.stock_minimo})`}
+                    </p>
 
-                  <div className="flex items-center gap-2 border-t border-carbon-2 pt-3">
-                    <button
-                      onClick={() => handleToggleActivo(p)}
-                      className="flex-1 rounded-lg border border-carbon-2 py-1.5 font-body text-xs text-criss transition-colors hover:border-negro hover:text-negro"
-                    >
-                      {p.activo ? "Desactivar" : "Activar"}
-                    </button>
-                    <button
-                      onClick={() => abrirModalEditar(p)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-carbon-2 text-criss transition-colors hover:border-negro hover:text-negro"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleEliminarProducto(p.id)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-carbon-2 text-criss transition-colors hover:border-amarillo hover:text-amarillo"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-2 border-t border-carbon-2 pt-3">
+                      <button
+                        onClick={() => handleToggleActivo(p)}
+                        className="flex-1 rounded-lg border border-carbon-2 py-1.5 font-body text-xs text-criss transition-colors hover:border-negro hover:text-negro"
+                      >
+                        {p.activo ? "Desactivar" : "Activar"}
+                      </button>
+                      <button
+                        onClick={() => abrirModalEditar(p)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-carbon-2 text-criss transition-colors hover:border-negro hover:text-negro"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleEliminarProducto(p.id)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-carbon-2 text-criss transition-colors hover:border-amarillo hover:text-amarillo"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -462,8 +485,28 @@ export function CafeteriaTab() {
           value={formPrecio}
           onChange={(e) => setFormPrecio(e.target.value)}
           placeholder="0.00"
-          className="mb-4 w-full rounded-lg border border-carbon-2 bg-carbon px-3 py-2 font-body text-blanco outline-none focus:border-amarillo"
+          className="mb-3 w-full rounded-lg border border-carbon-2 bg-carbon px-3 py-2 font-body text-blanco outline-none focus:border-amarillo"
         />
+        <div className="mb-4 grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block font-body text-xs uppercase text-criss">Stock actual</label>
+            <input
+              type="number"
+              value={formStockActual}
+              onChange={(e) => setFormStockActual(e.target.value)}
+              className="w-full rounded-lg border border-carbon-2 bg-carbon px-3 py-2 font-body text-blanco outline-none focus:border-amarillo"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block font-body text-xs uppercase text-criss">Stock mínimo</label>
+            <input
+              type="number"
+              value={formStockMinimo}
+              onChange={(e) => setFormStockMinimo(e.target.value)}
+              className="w-full rounded-lg border border-carbon-2 bg-carbon px-3 py-2 font-body text-blanco outline-none focus:border-amarillo"
+            />
+          </div>
+        </div>
         <Button type="button" disabled={procesando} onClick={handleGuardarProducto} className="w-full">
           {procesando ? "Guardando..." : "Guardar"}
         </Button>
