@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { AlertTriangle, Plus, Pencil, Trash2, Package, Coffee, Boxes, Search } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, Package, Coffee, Boxes, Search } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
 import { Modal } from "../../components/ui/Modal";
@@ -21,7 +21,7 @@ type SubTab = "resumen" | "cafeteria" | "insumos";
 
 export function InventarioTab() {
   const { usuario } = useAuth();
-  const { mostrarExito, mostrarError } = useToast();
+  const { mostrarError } = useToast();
   const [subTab, setSubTab] = useState<SubTab>("resumen");
 
   const [productos, setProductos] = useState<ProductoCafeteriaDB[]>([]);

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Plus, Pencil, Trash2, Search, Users, Phone, Cake, PartyPopper } from "lucide-react";
+import { Plus, Trash2, Search, Users, Phone, Cake, PartyPopper } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
 import { Modal } from "../../components/ui/Modal";
