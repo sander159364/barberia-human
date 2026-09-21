@@ -54,13 +54,10 @@ export function Lounge() {
                   <p className="mb-2 font-body text-[10px] font-medium uppercase tracking-[0.28em] text-amarillo">
                     Huaman Barber Club
                   </p>
-
                   <h3 className="font-display text-2xl uppercase tracking-wide text-blanco sm:text-3xl">
                     Lounge &amp; Coffee
                   </h3>
                 </div>
-
-
               </div>
             </div>
           </div>

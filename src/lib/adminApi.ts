@@ -72,28 +72,48 @@ export interface CajaMovimientoDB {
   creado_en: string;
 }
 
+// ============================================================
+// RESERVAS / CITAS
+// ============================================================
+
 export async function fetchCitas() {
   const { data, error } = await supabase
     .from("reservas")
     .select("*, servicios(nombre, precio), barberos(nombre)")
     .order("fecha", { ascending: false })
     .order("hora", { ascending: false });
+
   if (error) throw error;
+
   return data as CitaDB[];
 }
 
-export async function actualizarEstadoCita(token: string, citaId: string, estado: string) {
+export async function actualizarEstadoCita(
+  token: string,
+  citaId: string,
+  estado: string
+) {
   const { error } = await supabase.rpc("actualizar_estado_cita", {
     p_token: token,
     p_cita_id: citaId,
     p_estado: estado,
   });
+
   if (error) throw error;
 }
 
+// ============================================================
+// SERVICIOS
+// ============================================================
+
 export async function fetchServicios() {
-  const { data, error } = await supabase.from("servicios").select("*").order("orden");
+  const { data, error } = await supabase
+    .from("servicios")
+    .select("*")
+    .order("orden");
+
   if (error) throw error;
+
   return data as ServicioDB[];
 }
 
@@ -103,17 +123,28 @@ export async function subirImagenServicio(file: File): Promise<string> {
 
   const { error } = await supabase.storage
     .from("servicios")
-    .upload(nombreArchivo, file, { upsert: false });
+    .upload(nombreArchivo, file, {
+      upsert: false,
+    });
 
   if (error) throw error;
 
-  const { data } = supabase.storage.from("servicios").getPublicUrl(nombreArchivo);
+  const { data } = supabase.storage
+    .from("servicios")
+    .getPublicUrl(nombreArchivo);
+
   return data.publicUrl;
 }
 
 export async function crearServicio(
   token: string,
-  servicio: { nombre: string; descripcion: string; duracion_min: number; precio: number; imagen_url?: string | null }
+  servicio: {
+    nombre: string;
+    descripcion: string;
+    duracion_min: number;
+    precio: number;
+    imagen_url?: string | null;
+  }
 ) {
   const { data, error } = await supabase.rpc("crear_servicio", {
     p_token: token,
@@ -123,11 +154,16 @@ export async function crearServicio(
     p_precio: servicio.precio,
     p_imagen_url: servicio.imagen_url ?? null,
   });
+
   if (error) throw error;
+
   return data as ServicioDB;
 }
 
-export async function actualizarServicio(token: string, servicio: ServicioDB) {
+export async function actualizarServicio(
+  token: string,
+  servicio: ServicioDB
+) {
   const { error } = await supabase.rpc("actualizar_servicio", {
     p_token: token,
     p_id: servicio.id,
@@ -138,21 +174,41 @@ export async function actualizarServicio(token: string, servicio: ServicioDB) {
     p_activo: servicio.activo,
     p_imagen_url: servicio.imagen_url,
   });
+
   if (error) throw error;
 }
 
-export async function eliminarServicio(token: string, id: string) {
-  const { error } = await supabase.rpc("eliminar_servicio", { p_token: token, p_id: id });
+export async function eliminarServicio(
+  token: string,
+  id: string
+) {
+  const { error } = await supabase.rpc("eliminar_servicio", {
+    p_token: token,
+    p_id: id,
+  });
+
   if (error) throw error;
 }
+
+// ============================================================
+// HORARIOS
+// ============================================================
 
 export async function fetchHorarios() {
-  const { data, error } = await supabase.from("horarios").select("*").order("dia_semana");
+  const { data, error } = await supabase
+    .from("horarios")
+    .select("*")
+    .order("dia_semana");
+
   if (error) throw error;
+
   return data as HorarioDB[];
 }
 
-export async function actualizarHorario(token: string, horario: HorarioDB) {
+export async function actualizarHorario(
+  token: string,
+  horario: HorarioDB
+) {
   const { error } = await supabase.rpc("actualizar_horario", {
     p_token: token,
     p_dia_semana: horario.dia_semana,
@@ -160,56 +216,91 @@ export async function actualizarHorario(token: string, horario: HorarioDB) {
     p_hora_fin: horario.hora_fin,
     p_activo: horario.activo,
   });
+
   if (error) throw error;
 }
 
-// ---------------- CAFETERÍA ----------------
+// ============================================================
+// CAFETERÍA
+// ============================================================
 
 export async function fetchProductosCafeteria() {
   const { data, error } = await supabase
     .from("productos_cafeteria")
     .select("*")
     .order("orden");
+
   if (error) throw error;
+
   return data as ProductoCafeteriaDB[];
 }
 
 export async function crearProductoCafeteria(
   token: string,
-  producto: { nombre: string; descripcion: string; precio: number; stockActual?: number; stockMinimo?: number }
+  producto: {
+    nombre: string;
+    descripcion: string;
+    precio: number;
+    stockActual?: number;
+    stockMinimo?: number;
+  }
 ) {
-  const { data, error } = await supabase.rpc("crear_producto_cafeteria", {
-    p_token: token,
-    p_nombre: producto.nombre,
-    p_descripcion: producto.descripcion,
-    p_precio: producto.precio,
-    p_stock_actual: producto.stockActual ?? 0,
-    p_stock_minimo: producto.stockMinimo ?? 0,
-  });
+  const { data, error } = await supabase.rpc(
+    "crear_producto_cafeteria",
+    {
+      p_token: token,
+      p_nombre: producto.nombre,
+      p_descripcion: producto.descripcion,
+      p_precio: producto.precio,
+      p_stock_actual: producto.stockActual ?? 0,
+      p_stock_minimo: producto.stockMinimo ?? 0,
+    }
+  );
+
   if (error) throw error;
+
   return data as ProductoCafeteriaDB;
 }
 
-export async function actualizarProductoCafeteria(token: string, producto: ProductoCafeteriaDB) {
-  const { error } = await supabase.rpc("actualizar_producto_cafeteria", {
-    p_token: token,
-    p_id: producto.id,
-    p_nombre: producto.nombre,
-    p_descripcion: producto.descripcion,
-    p_precio: producto.precio,
-    p_activo: producto.activo,
-    p_stock_actual: producto.stock_actual,
-    p_stock_minimo: producto.stock_minimo,
-  });
+export async function actualizarProductoCafeteria(
+  token: string,
+  producto: ProductoCafeteriaDB
+) {
+  const { error } = await supabase.rpc(
+    "actualizar_producto_cafeteria",
+    {
+      p_token: token,
+      p_id: producto.id,
+      p_nombre: producto.nombre,
+      p_descripcion: producto.descripcion,
+      p_precio: producto.precio,
+      p_activo: producto.activo,
+      p_stock_actual: producto.stock_actual,
+      p_stock_minimo: producto.stock_minimo,
+    }
+  );
+
   if (error) throw error;
 }
 
-export async function eliminarProductoCafeteria(token: string, id: string) {
-  const { error } = await supabase.rpc("eliminar_producto_cafeteria", { p_token: token, p_id: id });
+export async function eliminarProductoCafeteria(
+  token: string,
+  id: string
+) {
+  const { error } = await supabase.rpc(
+    "eliminar_producto_cafeteria",
+    {
+      p_token: token,
+      p_id: id,
+    }
+  );
+
   if (error) throw error;
 }
 
-// ---------------- CAJA ----------------
+// ============================================================
+// CAJA
+// ============================================================
 
 export async function fetchCajaSesionActiva() {
   const { data, error } = await supabase
@@ -217,35 +308,51 @@ export async function fetchCajaSesionActiva() {
     .select("*")
     .eq("estado", "abierta")
     .maybeSingle();
+
   if (error) throw error;
+
   return data as CajaSesionDB | null;
 }
 
-export async function fetchMovimientosCaja(sesionId: string) {
+export async function fetchMovimientosCaja(
+  sesionId: string
+) {
   const { data, error } = await supabase
     .from("caja_movimientos")
     .select("*")
     .eq("sesion_id", sesionId)
     .order("creado_en", { ascending: false });
+
   if (error) throw error;
+
   return data as CajaMovimientoDB[];
 }
 
-export async function abrirCaja(token: string, montoInicial: number) {
+export async function abrirCaja(
+  token: string,
+  montoInicial: number
+) {
   const { data, error } = await supabase.rpc("abrir_caja", {
     p_token: token,
     p_monto_inicial: montoInicial,
   });
+
   if (error) throw error;
+
   return data as CajaSesionDB;
 }
 
-export async function cerrarCaja(token: string, montoFinalReal: number) {
+export async function cerrarCaja(
+  token: string,
+  montoFinalReal: number
+) {
   const { data, error } = await supabase.rpc("cerrar_caja", {
     p_token: token,
     p_monto_final_real: montoFinalReal,
   });
+
   if (error) throw error;
+
   return data as CajaSesionDB;
 }
 
@@ -257,7 +364,9 @@ export async function fetchReservasPendientesDePago() {
     .neq("estado", "cancelada")
     .order("fecha", { ascending: false })
     .order("hora", { ascending: false });
+
   if (error) throw error;
+
   return data as CitaDB[];
 }
 
@@ -268,13 +377,17 @@ export async function registrarMovimientoManual(
   monto: number,
   metodoPago?: "efectivo" | "yape"
 ) {
-  const { error } = await supabase.rpc("registrar_movimiento_manual", {
-    p_token: token,
-    p_tipo: tipo,
-    p_concepto: concepto,
-    p_monto: monto,
-    p_metodo_pago: metodoPago ?? null,
-  });
+  const { error } = await supabase.rpc(
+    "registrar_movimiento_manual",
+    {
+      p_token: token,
+      p_tipo: tipo,
+      p_concepto: concepto,
+      p_monto: monto,
+      p_metodo_pago: metodoPago ?? null,
+    }
+  );
+
   if (error) throw error;
 }
 
@@ -283,28 +396,41 @@ export async function registrarPagoReserva(
   reservaId: string,
   metodoPago: "efectivo" | "yape"
 ) {
-  const { error } = await supabase.rpc("marcar_reserva_pagada", {
-    p_token: token,
-    p_reserva_id: reservaId,
-    p_metodo_pago: metodoPago,
-  });
+  const { error } = await supabase.rpc(
+    "marcar_reserva_pagada",
+    {
+      p_token: token,
+      p_reserva_id: reservaId,
+      p_metodo_pago: metodoPago,
+    }
+  );
+
   if (error) throw error;
 }
 
 export async function registrarVentaCafeteria(
   token: string,
-  items: { producto_id: string; cantidad: number }[],
+  items: {
+    producto_id: string;
+    cantidad: number;
+  }[],
   metodoPago: "efectivo" | "yape"
 ) {
-  const { error } = await supabase.rpc("registrar_venta_cafeteria", {
-    p_token: token,
-    p_items: items,
-    p_metodo_pago: metodoPago,
-  });
+  const { error } = await supabase.rpc(
+    "registrar_venta_cafeteria",
+    {
+      p_token: token,
+      p_items: items,
+      p_metodo_pago: metodoPago,
+    }
+  );
+
   if (error) throw error;
 }
 
-// ---------------- BARBEROS ----------------
+// ============================================================
+// BARBEROS
+// ============================================================
 
 export interface BarberoDB {
   id: string;
@@ -324,99 +450,168 @@ export interface HorarioBarberoDB {
 }
 
 export async function fetchBarberos() {
-  const { data, error } = await supabase.from("barberos").select("*").order("orden");
+  const { data, error } = await supabase
+    .from("barberos")
+    .select("*")
+    .order("orden");
+
   if (error) throw error;
+
   return data as BarberoDB[];
 }
 
-export async function subirImagenBarbero(file: File): Promise<string> {
+export async function subirImagenBarbero(
+  file: File
+): Promise<string> {
   const extension = file.name.split(".").pop();
   const nombreArchivo = `${crypto.randomUUID()}.${extension}`;
 
   const { error } = await supabase.storage
     .from("barberos")
-    .upload(nombreArchivo, file, { upsert: false });
+    .upload(nombreArchivo, file, {
+      upsert: false,
+    });
 
   if (error) throw error;
 
-  const { data } = supabase.storage.from("barberos").getPublicUrl(nombreArchivo);
+  const { data } = supabase.storage
+    .from("barberos")
+    .getPublicUrl(nombreArchivo);
+
   return data.publicUrl;
 }
 
-export async function crearBarbero(token: string, nombre: string, imagenUrl?: string | null) {
-  const { data, error } = await supabase.rpc("crear_barbero", {
-    p_token: token,
-    p_nombre: nombre,
-    p_imagen_url: imagenUrl ?? null,
-  });
+export async function crearBarbero(
+  token: string,
+  nombre: string,
+  imagenUrl?: string | null
+) {
+  const { data, error } = await supabase.rpc(
+    "crear_barbero",
+    {
+      p_token: token,
+      p_nombre: nombre,
+      p_imagen_url: imagenUrl ?? null,
+    }
+  );
+
   if (error) throw error;
+
   return data as BarberoDB;
 }
 
 export async function actualizarBarbero(
   token: string,
-  barbero: { id: string; nombre: string; activo: boolean; imagen_url?: string | null }
+  barbero: {
+    id: string;
+    nombre: string;
+    activo: boolean;
+    imagen_url?: string | null;
+  }
 ) {
-  const { error } = await supabase.rpc("actualizar_barbero", {
-    p_token: token,
-    p_id: barbero.id,
-    p_nombre: barbero.nombre,
-    p_activo: barbero.activo,
-    p_imagen_url: barbero.imagen_url ?? null,
-  });
+  const { error } = await supabase.rpc(
+    "actualizar_barbero",
+    {
+      p_token: token,
+      p_id: barbero.id,
+      p_nombre: barbero.nombre,
+      p_activo: barbero.activo,
+      p_imagen_url: barbero.imagen_url ?? null,
+    }
+  );
+
   if (error) throw error;
 }
 
-export async function eliminarBarbero(token: string, id: string) {
-  const { error } = await supabase.rpc("eliminar_barbero", { p_token: token, p_id: id });
+export async function eliminarBarbero(
+  token: string,
+  id: string
+) {
+  const { error } = await supabase.rpc(
+    "eliminar_barbero",
+    {
+      p_token: token,
+      p_id: id,
+    }
+  );
+
   if (error) throw error;
 }
 
-export async function fetchServiciosDeBarbero(barberoId: string) {
+export async function fetchServiciosDeBarbero(
+  barberoId: string
+) {
   const { data, error } = await supabase
     .from("servicios_barberos")
     .select("servicio_id")
     .eq("barbero_id", barberoId);
+
   if (error) throw error;
-  return (data ?? []).map((r) => r.servicio_id as string);
+
+  return (data ?? []).map(
+    (r) => r.servicio_id as string
+  );
 }
 
-export async function actualizarServiciosBarbero(token: string, barberoId: string, servicioIds: string[]) {
-  const { error } = await supabase.rpc("actualizar_servicios_barbero", {
-    p_token: token,
-    p_barbero_id: barberoId,
-    p_servicio_ids: servicioIds,
-  });
+export async function actualizarServiciosBarbero(
+  token: string,
+  barberoId: string,
+  servicioIds: string[]
+) {
+  const { error } = await supabase.rpc(
+    "actualizar_servicios_barbero",
+    {
+      p_token: token,
+      p_barbero_id: barberoId,
+      p_servicio_ids: servicioIds,
+    }
+  );
+
   if (error) throw error;
 }
 
-export async function fetchHorariosBarbero(barberoId: string) {
+export async function fetchHorariosBarbero(
+  barberoId: string
+) {
   const { data, error } = await supabase
     .from("horarios_barbero")
     .select("*")
     .eq("barbero_id", barberoId)
     .order("dia_semana");
+
   if (error) throw error;
+
   return data as HorarioBarberoDB[];
 }
 
 export async function actualizarHorarioBarbero(
   token: string,
   barberoId: string,
-  horario: { dia_semana: number; hora_inicio: string | null; hora_fin: string | null; activo: boolean }
+  horario: {
+    dia_semana: number;
+    hora_inicio: string | null;
+    hora_fin: string | null;
+    activo: boolean;
+  }
 ) {
-  const { error } = await supabase.rpc("actualizar_horario_barbero", {
-    p_token: token,
-    p_barbero_id: barberoId,
-    p_dia_semana: horario.dia_semana,
-    p_hora_inicio: horario.hora_inicio,
-    p_hora_fin: horario.hora_fin,
-    p_activo: horario.activo,
-  });
+  const { error } = await supabase.rpc(
+    "actualizar_horario_barbero",
+    {
+      p_token: token,
+      p_barbero_id: barberoId,
+      p_dia_semana: horario.dia_semana,
+      p_hora_inicio: horario.hora_inicio,
+      p_hora_fin: horario.hora_fin,
+      p_activo: horario.activo,
+    }
+  );
+
   if (error) throw error;
 }
 
-// ---------------- USUARIOS / CONFIGURACIÓN ----------------
+// ============================================================
+// USUARIOS / CONFIGURACIÓN
+// ============================================================
 
 export interface UsuarioDB {
   id: string;
@@ -440,14 +635,28 @@ export const MODULOS_DISPONIBLES = [
 ] as const;
 
 export async function fetchUsuarios(token: string) {
-  const { data, error } = await supabase.rpc("listar_usuarios", { p_token: token });
+  const { data, error } = await supabase.rpc(
+    "listar_usuarios",
+    {
+      p_token: token,
+    }
+  );
+
   if (error) throw error;
+
   return data as UsuarioDB[];
 }
 
 export async function crearUsuario(
   token: string,
-  usuario: { nombre: string; email: string; password: string; rol: string; esAdmin: boolean; modulos: string[] }
+  usuario: {
+    nombre: string;
+    email: string;
+    password: string;
+    rol: string;
+    esAdmin: boolean;
+    modulos: string[];
+  }
 ) {
   const { error } = await supabase.rpc("crear_usuario", {
     p_token: token,
@@ -458,6 +667,7 @@ export async function crearUsuario(
     p_es_admin: usuario.esAdmin,
     p_modulos: usuario.modulos,
   });
+
   if (error) throw error;
 }
 
@@ -473,20 +683,27 @@ export async function actualizarUsuario(
     nuevaPassword?: string;
   }
 ) {
-  const { error } = await supabase.rpc("actualizar_usuario", {
-    p_token: token,
-    p_id: usuario.id,
-    p_nombre: usuario.nombre,
-    p_rol: usuario.rol,
-    p_es_admin: usuario.esAdmin,
-    p_modulos: usuario.modulos,
-    p_activo: usuario.activo,
-    p_nueva_password: usuario.nuevaPassword?.trim() || null,
-  });
+  const { error } = await supabase.rpc(
+    "actualizar_usuario",
+    {
+      p_token: token,
+      p_id: usuario.id,
+      p_nombre: usuario.nombre,
+      p_rol: usuario.rol,
+      p_es_admin: usuario.esAdmin,
+      p_modulos: usuario.modulos,
+      p_activo: usuario.activo,
+      p_nueva_password:
+        usuario.nuevaPassword?.trim() || null,
+    }
+  );
+
   if (error) throw error;
 }
 
-// ---------------- EXPORTAR CAJA ----------------
+// ============================================================
+// EXPORTAR CAJA
+// ============================================================
 
 export interface MovimientoExportDB {
   fecha: string;
@@ -499,21 +716,36 @@ export interface MovimientoExportDB {
   creado_por: string | null;
 }
 
-export async function fetchMovimientosCajaPorRango(fechaInicio: string, fechaFin: string) {
+export async function fetchMovimientosCajaPorRango(
+  fechaInicio: string,
+  fechaFin: string
+) {
   const { data, error } = await supabase
     .from("caja_movimientos")
     .select("*")
-    .gte("creado_en", `${fechaInicio}T00:00:00`)
-    .lte("creado_en", `${fechaFin}T23:59:59`)
-    .order("creado_en", { ascending: true });
+    .gte(
+      "creado_en",
+      `${fechaInicio}T00:00:00`
+    )
+    .lte(
+      "creado_en",
+      `${fechaFin}T23:59:59`
+    )
+    .order("creado_en", {
+      ascending: true,
+    });
 
   if (error) throw error;
 
   return (data as CajaMovimientoDB[]).map((m) => {
     const fechaObj = new Date(m.creado_en);
+
     return {
       fecha: fechaObj.toLocaleDateString("es-PE"),
-      hora: fechaObj.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }),
+      hora: fechaObj.toLocaleTimeString("es-PE", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
       tipo: m.tipo,
       origen: m.origen,
       concepto: m.concepto,
@@ -524,30 +756,49 @@ export async function fetchMovimientosCajaPorRango(fechaInicio: string, fechaFin
   });
 }
 
-// ---------------- PUSH NOTIFICATIONS ----------------
+// ============================================================
+// PUSH NOTIFICATIONS
+// ============================================================
 
 export async function guardarPushSubscription(
   token: string,
-  sub: { endpoint: string; p256dh: string; auth: string }
+  sub: {
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+  }
 ) {
-  const { error } = await supabase.rpc("guardar_push_subscription", {
-    p_token: token,
-    p_endpoint: sub.endpoint,
-    p_p256dh: sub.p256dh,
-    p_auth: sub.auth,
-  });
+  const { error } = await supabase.rpc(
+    "guardar_push_subscription",
+    {
+      p_token: token,
+      p_endpoint: sub.endpoint,
+      p_p256dh: sub.p256dh,
+      p_auth: sub.auth,
+    }
+  );
+
   if (error) throw error;
 }
 
-export async function eliminarPushSubscription(token: string, endpoint: string) {
-  const { error } = await supabase.rpc("eliminar_push_subscription", {
-    p_token: token,
-    p_endpoint: endpoint,
-  });
+export async function eliminarPushSubscription(
+  token: string,
+  endpoint: string
+) {
+  const { error } = await supabase.rpc(
+    "eliminar_push_subscription",
+    {
+      p_token: token,
+      p_endpoint: endpoint,
+    }
+  );
+
   if (error) throw error;
 }
 
-// ---------------- INVENTARIO: INSUMOS ----------------
+// ============================================================
+// INVENTARIO: INSUMOS
+// ============================================================
 
 export interface InsumoDB {
   id: string;
@@ -561,91 +812,395 @@ export interface InsumoDB {
 }
 
 export async function fetchInsumos() {
-  const { data, error } = await supabase.from("insumos").select("*").order("nombre");
+  const { data, error } = await supabase
+    .from("insumos")
+    .select("*")
+    .order("nombre");
+
   if (error) throw error;
+
   return data as InsumoDB[];
 }
 
 export async function crearInsumo(
   token: string,
-  insumo: { nombre: string; categoria: string; unidad: string; stockActual: number; stockMinimo: number }
+  insumo: {
+    nombre: string;
+    categoria: string;
+    unidad: string;
+    stockActual: number;
+    stockMinimo: number;
+  }
 ) {
-  const { data, error } = await supabase.rpc("crear_insumo", {
-    p_token: token,
-    p_nombre: insumo.nombre,
-    p_categoria: insumo.categoria || null,
-    p_unidad: insumo.unidad,
-    p_stock_actual: insumo.stockActual,
-    p_stock_minimo: insumo.stockMinimo,
-  });
+  const { data, error } = await supabase.rpc(
+    "crear_insumo",
+    {
+      p_token: token,
+      p_nombre: insumo.nombre,
+      p_categoria: insumo.categoria || null,
+      p_unidad: insumo.unidad,
+      p_stock_actual: insumo.stockActual,
+      p_stock_minimo: insumo.stockMinimo,
+    }
+  );
+
   if (error) throw error;
+
   return data as InsumoDB;
 }
 
-export async function actualizarInsumo(token: string, insumo: InsumoDB) {
-  const { error } = await supabase.rpc("actualizar_insumo", {
-    p_token: token,
-    p_id: insumo.id,
-    p_nombre: insumo.nombre,
-    p_categoria: insumo.categoria,
-    p_unidad: insumo.unidad,
-    p_stock_actual: insumo.stock_actual,
-    p_stock_minimo: insumo.stock_minimo,
-    p_activo: insumo.activo,
-  });
+export async function actualizarInsumo(
+  token: string,
+  insumo: InsumoDB
+) {
+  const { error } = await supabase.rpc(
+    "actualizar_insumo",
+    {
+      p_token: token,
+      p_id: insumo.id,
+      p_nombre: insumo.nombre,
+      p_categoria: insumo.categoria,
+      p_unidad: insumo.unidad,
+      p_stock_actual: insumo.stock_actual,
+      p_stock_minimo: insumo.stock_minimo,
+      p_activo: insumo.activo,
+    }
+  );
+
   if (error) throw error;
 }
 
-export async function eliminarInsumo(token: string, id: string) {
-  const { error } = await supabase.rpc("eliminar_insumo", { p_token: token, p_id: id });
+export async function eliminarInsumo(
+  token: string,
+  id: string
+) {
+  const { error } = await supabase.rpc(
+    "eliminar_insumo",
+    {
+      p_token: token,
+      p_id: id,
+    }
+  );
+
   if (error) throw error;
 }
 
-// ---------------- CLIENTES ----------------
+// ============================================================
+// CLIENTES
+// ============================================================
 
 export interface ClienteDB {
   id: string;
+
   nombre: string;
   apellido: string;
+
   celular: string | null;
   fecha_nacimiento: string | null;
+
   creado_en: string;
+
+  // DNI
+  dni: string | null;
+
+  // Datos obtenidos desde API Manager
+  apellido_paterno: string | null;
+  apellido_materno: string | null;
+  nombre_completo: string | null;
+  direccion: string | null;
+  ubigeo: string | null;
 }
 
+export interface ClienteDNI {
+  dni: string;
+
+  apellido_paterno: string;
+  apellido_materno: string;
+
+  nombres: string;
+
+  nombre_completo: string;
+
+  fecha_nacimiento: string | null;
+
+  direccion: string;
+
+  ubigeo: string;
+}
+
+// ============================================================
+// OBTENER CLIENTES
+// ============================================================
+
 export async function fetchClientes() {
-  const { data, error } = await supabase.from("clientes").select("*").order("nombre");
+  const { data, error } = await supabase
+    .from("clientes")
+    .select("*")
+    .order("nombre");
+
   if (error) throw error;
+
   return data as ClienteDB[];
 }
 
-export async function crearCliente(
-  token: string,
-  cliente: { nombre: string; apellido: string; celular: string; fechaNacimiento: string | null }
-) {
-  const { data, error } = await supabase.rpc("crear_cliente", {
-    p_token: token,
-    p_nombre: cliente.nombre,
-    p_apellido: cliente.apellido,
-    p_celular: cliente.celular || null,
-    p_fecha_nacimiento: cliente.fechaNacimiento || null,
-  });
-  if (error) throw error;
+// ============================================================
+// BUSCAR CLIENTE POR DNI
+// ============================================================
+
+/**
+ * Busca primero el DNI en nuestra propia base de datos.
+ *
+ * Esta función NO consume API Manager.
+ *
+ * Si encuentra el cliente:
+ *   retorna ClienteDB
+ *
+ * Si no encuentra:
+ *   retorna null
+ */
+export async function buscarClientePorDni(
+  dni: string
+): Promise<ClienteDB | null> {
+  const dniLimpio = dni.replace(/\D/g, "");
+
+  if (!/^\d{8}$/.test(dniLimpio)) {
+    throw new Error(
+      "El DNI debe contener exactamente 8 dígitos."
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("clientes")
+    .select("*")
+    .eq("dni", dniLimpio)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
   return data as ClienteDB;
 }
 
-export async function actualizarCliente(token: string, cliente: ClienteDB) {
-  const { error } = await supabase.rpc("actualizar_cliente", {
-    p_token: token,
-    p_id: cliente.id,
-    p_nombre: cliente.nombre,
-    p_apellido: cliente.apellido,
-    p_celular: cliente.celular,
-    p_fecha_nacimiento: cliente.fecha_nacimiento,
-  });
+// ============================================================
+// CONSULTAR DNI EN API MANAGER
+// ============================================================
+
+/**
+ * IMPORTANTE:
+ *
+ * El token de API Manager NO se encuentra aquí.
+ *
+ * React llama a nuestra Edge Function:
+ *
+ * consultar-dni
+ *
+ * y la Edge Function utiliza el secreto
+ * API_MANAGER_TOKEN almacenado en Supabase.
+ */
+export async function consultarDni(
+  dni: string
+): Promise<ClienteDNI> {
+  const dniLimpio = dni.replace(/\D/g, "");
+
+  if (!/^\d{8}$/.test(dniLimpio)) {
+    throw new Error(
+      "El DNI debe contener exactamente 8 dígitos."
+    );
+  }
+
+  const { data, error } =
+    await supabase.functions.invoke(
+      "consultar-dni",
+      {
+        body: {
+          dni: dniLimpio,
+        },
+      }
+    );
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data?.encontrado || !data?.cliente) {
+    throw new Error(
+      data?.error ||
+        "No se encontró información para ese DNI."
+    );
+  }
+
+  return data.cliente as ClienteDNI;
+}
+
+// ============================================================
+// CONVERTIR FECHA DNI
+// ============================================================
+
+/**
+ * API Manager devuelve:
+ *
+ * DD/MM/YYYY
+ *
+ * PostgreSQL necesita:
+ *
+ * YYYY-MM-DD
+ */
+export function convertirFechaDNI(
+  fecha: string | null
+): string | null {
+  if (!fecha) {
+    return null;
+  }
+
+  const partes = fecha.split("/");
+
+  if (partes.length !== 3) {
+    return null;
+  }
+
+  const [dia, mes, anio] = partes;
+
+  if (!dia || !mes || !anio) {
+    return null;
+  }
+
+  return `${anio}-${mes.padStart(
+    2,
+    "0"
+  )}-${dia.padStart(2, "0")}`;
+}
+
+// ============================================================
+// CREAR CLIENTE
+// ============================================================
+
+export async function crearCliente(
+  token: string,
+  cliente: {
+    nombre: string;
+    apellido: string;
+    celular: string;
+    fechaNacimiento: string | null;
+
+    dni?: string | null;
+
+    apellidoPaterno?: string | null;
+
+    apellidoMaterno?: string | null;
+
+    nombreCompleto?: string | null;
+
+    direccion?: string | null;
+
+    ubigeo?: string | null;
+  }
+) {
+  const { data, error } = await supabase.rpc(
+    "crear_cliente",
+    {
+      p_token: token,
+
+      p_nombre: cliente.nombre,
+
+      p_apellido: cliente.apellido,
+
+      p_celular:
+        cliente.celular || null,
+
+      p_fecha_nacimiento:
+        cliente.fechaNacimiento || null,
+
+      p_dni:
+        cliente.dni || null,
+
+      p_apellido_paterno:
+        cliente.apellidoPaterno || null,
+
+      p_apellido_materno:
+        cliente.apellidoMaterno || null,
+
+      p_nombre_completo:
+        cliente.nombreCompleto || null,
+
+      p_direccion:
+        cliente.direccion || null,
+
+      p_ubigeo:
+        cliente.ubigeo || null,
+    }
+  );
+
+  if (error) throw error;
+
+  return data as ClienteDB;
+}
+
+// ============================================================
+// ACTUALIZAR CLIENTE
+// ============================================================
+
+export async function actualizarCliente(
+  token: string,
+  cliente: ClienteDB
+) {
+  const { error } = await supabase.rpc(
+    "actualizar_cliente",
+    {
+      p_token: token,
+
+      p_id: cliente.id,
+
+      p_nombre: cliente.nombre,
+
+      p_apellido: cliente.apellido,
+
+      p_celular: cliente.celular,
+
+      p_fecha_nacimiento:
+        cliente.fecha_nacimiento,
+
+      p_dni: cliente.dni,
+
+      p_apellido_paterno:
+        cliente.apellido_paterno,
+
+      p_apellido_materno:
+        cliente.apellido_materno,
+
+      p_nombre_completo:
+        cliente.nombre_completo,
+
+      p_direccion:
+        cliente.direccion,
+
+      p_ubigeo:
+        cliente.ubigeo,
+    }
+  );
+
   if (error) throw error;
 }
 
-export async function eliminarCliente(token: string, id: string) {
-  const { error } = await supabase.rpc("eliminar_cliente", { p_token: token, p_id: id });
+// ============================================================
+// ELIMINAR CLIENTE
+// ============================================================
+
+export async function eliminarCliente(
+  token: string,
+  id: string
+) {
+  const { error } = await supabase.rpc(
+    "eliminar_cliente",
+    {
+      p_token: token,
+      p_id: id,
+    }
+  );
+
   if (error) throw error;
 }

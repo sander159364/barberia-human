@@ -1,6 +1,21 @@
 import { useState } from "react";
-import { Calendar, Scissors, Clock, Coffee, Wallet, LogOut, PanelLeft, Home, X, Settings, Boxes, Users } from "lucide-react";
+import {
+  LayoutDashboard,
+  Calendar,
+  Scissors,
+  Clock,
+  Coffee,
+  Wallet,
+  LogOut,
+  PanelLeft,
+  Home,
+  X,
+  Settings,
+  Boxes,
+  Users,
+} from "lucide-react";
 import { useAuth } from "../features/auth/AuthContext";
+import { DashboardTab } from "../features/admin/DashboardTab";
 import { ReservasTab } from "../features/admin/ReservasTab";
 import { ServiciosTab } from "../features/admin/ServiciosTab";
 import { HorariosTab } from "../features/admin/HorariosTab";
@@ -11,9 +26,19 @@ import { InventarioTab } from "../features/admin/InventarioTab";
 import { ClientesTab } from "../features/admin/ClientesTab";
 import { BotonNotificaciones } from "../components/ui/BotonNotificaciones";
 
-type Tab = "reservas" | "servicios" | "horarios" | "cafeteria" | "inventario" | "clientes" | "caja" | "configuracion";
+type Tab =
+  | "dashboard"
+  | "reservas"
+  | "servicios"
+  | "horarios"
+  | "cafeteria"
+  | "inventario"
+  | "clientes"
+  | "caja"
+  | "configuracion";
 
 const TABS: { id: Tab; label: string; icono: React.ReactNode }[] = [
+  { id: "dashboard", label: "Dashboard", icono: <LayoutDashboard size={18} /> },
   { id: "reservas", label: "Reservas", icono: <Calendar size={18} /> },
   { id: "servicios", label: "Servicios", icono: <Scissors size={18} /> },
   { id: "horarios", label: "Horarios", icono: <Clock size={18} /> },
@@ -36,7 +61,7 @@ const RADIO_RUEDA = 110;
 
 export function AdminPage() {
   const { usuario, logout } = useAuth();
-  const [tab, setTab] = useState<Tab>("reservas");
+  const [tab, setTab] = useState<Tab>("dashboard");
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
 
   const tabActivo = TABS.find((t) => t.id === tab);
@@ -166,6 +191,7 @@ export function AdminPage() {
       </div>
 
       <div className="mx-auto max-w-5xl px-4 py-6 pb-32 sm:px-8 sm:py-8 lg:pb-8">
+        {tab === "dashboard" && <DashboardTab />}
         {tab === "reservas" && <ReservasTab />}
         {tab === "servicios" && <ServiciosTab />}
         {tab === "horarios" && <HorariosTab />}
