@@ -8,7 +8,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", {
       headers: corsHeaders,
@@ -16,7 +15,6 @@ serve(async (req) => {
   }
 
   try {
-    // Solo permitimos POST
     if (req.method !== "POST") {
       return new Response(
         JSON.stringify({
@@ -32,12 +30,10 @@ serve(async (req) => {
       );
     }
 
-    // Leer body
     const body = await req.json();
 
-    const dni = String(body.dni ?? "").trim();
+    const dni = String(body.dni ?? "").replace(/\D/g, "");
 
-    // Validar DNI
     if (!/^\d{8}$/.test(dni)) {
       return new Response(
         JSON.stringify({
@@ -53,13 +49,12 @@ serve(async (req) => {
       );
     }
 
-    // Obtener token desde las variables de entorno
-    const apiToken = Deno.env.get("API_MANAGER_TOKEN");
+    const apiToken = Deno.env.get("CONSULTADATOS_TOKEN");
 
     if (!apiToken) {
       return new Response(
         JSON.stringify({
-          error: "No está configurado API_MANAGER_TOKEN",
+          error: "No está configurado CONSULTADATOS_TOKEN",
         }),
         {
           status: 500,
@@ -71,9 +66,8 @@ serve(async (req) => {
       );
     }
 
-    // Consultar API Manager
     const response = await fetch(
-      `https://apimanager.online/api/v1/dni?dni=${dni}`,
+      `https://api2.consultadatos.com/api/dni/${dni}`,
       {
         method: "GET",
         headers: {
@@ -83,16 +77,32 @@ serve(async (req) => {
       }
     );
 
-    const result = await response.json();
+    let result: any = null;
 
-    // Error de API Manager
+    try {
+      result = await response.json();
+    } catch {
+      result = null;
+    }
+
+    console.log("Respuesta Consultas Datos:", {
+      status: response.status,
+      result,
+    });
+
     if (!response.ok) {
+      console.error("Error Consultas Datos API:", {
+        status: response.status,
+        result,
+      });
+
       return new Response(
         JSON.stringify({
+          encontrado: false,
           error:
             result?.error ||
             result?.message ||
-            "Error al consultar API Manager",
+            `Error al consultar el DNI. Código: ${response.status}`,
         }),
         {
           status: response.status,
@@ -104,11 +114,37 @@ serve(async (req) => {
       );
     }
 
-    // API Manager devuelve los resultados dentro de data
-    const persona = result?.data?.[0];
+    /*
+     * Algunas APIs pueden devolver:
+     *
+     * {
+     *   DNI: "...",
+     *   NOMBRES: "...",
+     *   ...
+     * }
+     *
+     * o eventualmente envolver los datos dentro de:
+     *
+     * {
+     *   data: {
+     *     DNI: "...",
+     *     ...
+     *   }
+     * }
+     *
+     * Por eso soportamos ambas estructuras.
+     */
 
-    // DNI no encontrado
-    if (!persona) {
+    const persona =
+      result?.data ??
+      result?.cliente ??
+      result;
+
+    if (
+      !persona ||
+      typeof persona !== "object" ||
+      !persona.DNI
+    ) {
       return new Response(
         JSON.stringify({
           encontrado: false,
@@ -124,16 +160,72 @@ serve(async (req) => {
       );
     }
 
-    // Devolver solamente los datos que necesitamos
+    const dniRespuesta = String(persona.DNI ?? dni).trim();
+
+    const nombres = String(persona.NOMBRES ?? "").trim();
+    const apellidoPaterno = String(persona.AP_PAT ?? "").trim();
+    const apellidoMaterno = String(persona.AP_MAT ?? "").trim();
+
+    const nombreCompleto =
+      String(persona.NOMBRE_COMPLETO ?? "").trim() ||
+      [nombres, apellidoPaterno, apellidoMaterno]
+        .filter(Boolean)
+        .join(" ");
+
     const cliente = {
-      dni,
-      apellido_paterno: persona.ap_pat ?? "",
-      apellido_materno: persona.ap_mat ?? "",
-      nombres: persona.nombres ?? "",
-      nombre_completo: persona.full_name ?? "",
-      fecha_nacimiento: persona.fecha_nac ?? null,
-      direccion: persona.direccion ?? "",
-      ubigeo: persona.ubigeo_dir ?? "",
+      dni: dniRespuesta,
+
+      dig_ruc:
+        persona.DIG_RUC != null
+          ? String(persona.DIG_RUC)
+          : null,
+
+      apellido_paterno: apellidoPaterno,
+      apellido_materno: apellidoMaterno,
+
+      nombres,
+
+      nombre_completo: nombreCompleto,
+
+      fecha_nacimiento:
+        persona.FECHA_NAC != null
+          ? String(persona.FECHA_NAC)
+          : null,
+
+      ubigeo_nacimiento:
+        persona.UBIGEO_NAC != null
+          ? String(persona.UBIGEO_NAC)
+          : null,
+
+      ubigeo_direccion:
+        persona.UBIGEO_DIR != null
+          ? String(persona.UBIGEO_DIR)
+          : null,
+
+      direccion:
+        persona.DIRECCION != null
+          ? String(persona.DIRECCION)
+          : "",
+
+      sexo:
+        persona.SEXO != null
+          ? String(persona.SEXO)
+          : null,
+
+      estado_civil:
+        persona.EST_CIVIL != null
+          ? String(persona.EST_CIVIL)
+          : null,
+
+      madre:
+        persona.MADRE != null
+          ? String(persona.MADRE)
+          : null,
+
+      padre:
+        persona.PADRE != null
+          ? String(persona.PADRE)
+          : null,
     };
 
     return new Response(
@@ -154,7 +246,11 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        error: "Error interno al consultar el DNI",
+        encontrado: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Error interno al consultar el DNI",
       }),
       {
         status: 500,

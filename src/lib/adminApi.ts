@@ -889,32 +889,142 @@ export async function eliminarInsumo(
 // CLIENTES
 // ============================================================
 
+export type TipoDocumento = "dni" | "ruc";
+
+// ============================================================
+// RUC - TRABAJADORES
+// ============================================================
+
+export interface TrabajadorRUC {
+  numPensionista: string;
+  numPrestadoresServicio: string;
+  numTrabajadores: string;
+  periodo: string;
+}
+
+// ============================================================
+// RUC - REPRESENTANTES
+// ============================================================
+
+export interface RepresentanteRUC {
+  cargo: string;
+  fechaDesde: string;
+  nombre: string;
+  numDocumento: string;
+  tipDocumento: string;
+}
+
+// ============================================================
+// RUC - HISTÓRICO
+// ============================================================
+
+export interface HistoricoRUC {
+  condiciones: Record<string, unknown>[];
+
+  bajas: {
+    fechaBaja: string;
+    razonSocial: string;
+  }[];
+}
+
+// ============================================================
+// CLIENTE DB
+// ============================================================
+
 export interface ClienteDB {
   id: string;
 
-  nombre: string;
-  apellido: string;
+  tipo_documento: TipoDocumento;
+
+  nombre: string | null;
+  apellido: string | null;
 
   celular: string | null;
+
   fecha_nacimiento: string | null;
 
   creado_en: string;
 
+  // ==========================================================
   // DNI
+  // ==========================================================
+
   dni: string | null;
 
-  // Datos obtenidos desde API Manager
+  dig_ruc: string | null;
+
   apellido_paterno: string | null;
+
   apellido_materno: string | null;
+
   nombre_completo: string | null;
+
   direccion: string | null;
+
   ubigeo: string | null;
+
+  ubigeo_nacimiento: string | null;
+
+  ubigeo_direccion: string | null;
+
+  sexo: string | null;
+
+  estado_civil: string | null;
+
+  madre: string | null;
+
+  padre: string | null;
+
+  // ==========================================================
+  // RUC
+  // ==========================================================
+
+  ruc: string | null;
+
+  razon_social: string | null;
+
+  nombre_comercial: string | null;
+
+  tipo_contribuyente: string | null;
+
+  estado_ruc: string | null;
+
+  condicion_ruc: string | null;
+
+  domicilio_fiscal: string | null;
+
+  fecha_inscripcion: string | null;
+
+  actividad_economica: string | null;
+
+  sistema_contabilidad: string | null;
+
+  afiliado_ple: string | null;
+
+  emisor_electronico: string | null;
+
+  comprobantes_electronicos: string | null;
+
+  padrones: string | null;
+
+  cant_trabajadores: TrabajadorRUC[] | null;
+
+  representantes: RepresentanteRUC[] | null;
+
+  historico: HistoricoRUC | null;
 }
 
-export interface ClienteDNI {
+// ============================================================
+// RESPUESTA DNI
+// ============================================================
+
+export interface DatosDNI {
   dni: string;
 
+  dig_ruc: string | null;
+
   apellido_paterno: string;
+
   apellido_materno: string;
 
   nombres: string;
@@ -923,20 +1033,72 @@ export interface ClienteDNI {
 
   fecha_nacimiento: string | null;
 
+  ubigeo_nacimiento: string | null;
+
+  ubigeo_direccion: string | null;
+
   direccion: string;
 
-  ubigeo: string;
+  sexo: string | null;
+
+  estado_civil: string | null;
+
+  madre: string | null;
+
+  padre: string | null;
 }
 
 // ============================================================
-// OBTENER CLIENTES
+// RESPUESTA RUC
+// ============================================================
+
+export interface DatosRUC {
+  ruc: string;
+
+  razon_social: string;
+
+  nombre_comercial: string;
+
+  tipo_contribuyente: string;
+
+  estado: string;
+
+  condicion: string;
+
+  domicilio_fiscal: string;
+
+  fecha_inscripcion: string;
+
+  actividad_economica: string;
+
+  sistema_contabilidad: string;
+
+  afiliado_ple: string;
+
+  emisor_electronico: string;
+
+  comprobantes_electronicos: string;
+
+  padrones: string;
+
+  cant_trabajadores: TrabajadorRUC[];
+
+  representantes: RepresentanteRUC[];
+
+  historico: HistoricoRUC;
+}
+
+// ============================================================
+// LISTAR CLIENTES
 // ============================================================
 
 export async function fetchClientes() {
   const { data, error } = await supabase
     .from("clientes")
     .select("*")
-    .order("nombre");
+    .order("creado_en", {
+      ascending: false,
+    });
 
   if (error) throw error;
 
@@ -944,67 +1106,37 @@ export async function fetchClientes() {
 }
 
 // ============================================================
-// BUSCAR CLIENTE POR DNI
+// BUSCAR CLIENTE POR DOCUMENTO
+//
+// IMPORTANTE:
+// Esta función se ejecuta ANTES de consultar la API.
 // ============================================================
 
-/**
- * Busca primero el DNI en nuestra propia base de datos.
- *
- * Esta función NO consume API Manager.
- *
- * Si encuentra el cliente:
- *   retorna ClienteDB
- *
- * Si no encuentra:
- *   retorna null
- */
-export async function buscarClientePorDni(
-  dni: string
+export async function buscarClientePorDocumento(
+  tipo: TipoDocumento,
+  numero: string
 ): Promise<ClienteDB | null> {
-  const dniLimpio = dni.replace(/\D/g, "");
-
-  if (!/^\d{8}$/.test(dniLimpio)) {
-    throw new Error(
-      "El DNI debe contener exactamente 8 dígitos."
-    );
-  }
+  const columna = tipo === "dni" ? "dni" : "ruc";
 
   const { data, error } = await supabase
     .from("clientes")
     .select("*")
-    .eq("dni", dniLimpio)
+    .eq(columna, numero)
+    .limit(1)
     .maybeSingle();
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 
-  if (!data) {
-    return null;
-  }
-
-  return data as ClienteDB;
+  return data as ClienteDB | null;
 }
 
 // ============================================================
-// CONSULTAR DNI EN API MANAGER
+// CONSULTAR DNI
 // ============================================================
 
-/**
- * IMPORTANTE:
- *
- * El token de API Manager NO se encuentra aquí.
- *
- * React llama a nuestra Edge Function:
- *
- * consultar-dni
- *
- * y la Edge Function utiliza el secreto
- * API_MANAGER_TOKEN almacenado en Supabase.
- */
 export async function consultarDni(
   dni: string
-): Promise<ClienteDNI> {
+): Promise<DatosDNI> {
   const dniLimpio = dni.replace(/\D/g, "");
 
   if (!/^\d{8}$/.test(dniLimpio)) {
@@ -1023,9 +1155,7 @@ export async function consultarDni(
       }
     );
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 
   if (!data?.encontrado || !data?.cliente) {
     throw new Error(
@@ -1034,28 +1164,55 @@ export async function consultarDni(
     );
   }
 
-  return data.cliente as ClienteDNI;
+  return data.cliente as DatosDNI;
+}
+
+// ============================================================
+// CONSULTAR RUC
+// ============================================================
+
+export async function consultarRuc(
+  ruc: string
+): Promise<DatosRUC> {
+  const rucLimpio = ruc.replace(/\D/g, "");
+
+  if (!/^\d{11}$/.test(rucLimpio)) {
+    throw new Error(
+      "El RUC debe contener exactamente 11 dígitos."
+    );
+  }
+
+  const { data, error } =
+    await supabase.functions.invoke(
+      "consultar-ruc",
+      {
+        body: {
+          ruc: rucLimpio,
+        },
+      }
+    );
+
+  if (error) throw error;
+
+  if (!data?.encontrado || !data?.empresa) {
+    throw new Error(
+      data?.error ||
+        "No se encontró información para ese RUC."
+    );
+  }
+
+  return data.empresa as DatosRUC;
 }
 
 // ============================================================
 // CONVERTIR FECHA DNI
+// DD/MM/YYYY → YYYY-MM-DD
 // ============================================================
 
-/**
- * API Manager devuelve:
- *
- * DD/MM/YYYY
- *
- * PostgreSQL necesita:
- *
- * YYYY-MM-DD
- */
 export function convertirFechaDNI(
   fecha: string | null
 ): string | null {
-  if (!fecha) {
-    return null;
-  }
+  if (!fecha) return null;
 
   const partes = fecha.split("/");
 
@@ -1076,62 +1233,212 @@ export function convertirFechaDNI(
 }
 
 // ============================================================
+// DATOS PARA CREAR / ACTUALIZAR
+// ============================================================
+
+export interface DatosClienteFormulario {
+  tipoDocumento: TipoDocumento;
+
+  // ==========================================================
+  // COMUNES
+  // ==========================================================
+
+  nombre: string;
+
+  apellido: string;
+
+  celular: string;
+
+  fechaNacimiento: string | null;
+
+  direccion?: string | null;
+
+  // ==========================================================
+  // DNI
+  // ==========================================================
+
+  dni?: string | null;
+
+  digRuc?: string | null;
+
+  apellidoPaterno?: string | null;
+
+  apellidoMaterno?: string | null;
+
+  nombreCompleto?: string | null;
+
+  ubigeo?: string | null;
+
+  ubigeoNacimiento?: string | null;
+
+  ubigeoDireccion?: string | null;
+
+  sexo?: string | null;
+
+  estadoCivil?: string | null;
+
+  madre?: string | null;
+
+  padre?: string | null;
+
+  // ==========================================================
+  // RUC
+  // ==========================================================
+
+  ruc?: string | null;
+
+  razonSocial?: string | null;
+
+  nombreComercial?: string | null;
+
+  tipoContribuyente?: string | null;
+
+  estadoRuc?: string | null;
+
+  condicionRuc?: string | null;
+
+  domicilioFiscal?: string | null;
+
+  fechaInscripcion?: string | null;
+
+  actividadEconomica?: string | null;
+
+  sistemaContabilidad?: string | null;
+
+  afiliadoPle?: string | null;
+
+  emisorElectronico?: string | null;
+
+  comprobantesElectronicos?: string | null;
+
+  padrones?: string | null;
+
+  cantTrabajadores?: TrabajadorRUC[] | null;
+
+  representantes?: RepresentanteRUC[] | null;
+
+  historico?: HistoricoRUC | null;
+}
+
+// ============================================================
 // CREAR CLIENTE
 // ============================================================
 
 export async function crearCliente(
   token: string,
-  cliente: {
-    nombre: string;
-    apellido: string;
-    celular: string;
-    fechaNacimiento: string | null;
-
-    dni?: string | null;
-
-    apellidoPaterno?: string | null;
-
-    apellidoMaterno?: string | null;
-
-    nombreCompleto?: string | null;
-
-    direccion?: string | null;
-
-    ubigeo?: string | null;
-  }
+  c: DatosClienteFormulario
 ) {
   const { data, error } = await supabase.rpc(
     "crear_cliente",
     {
       p_token: token,
 
-      p_nombre: cliente.nombre,
+      p_tipo_documento:
+        c.tipoDocumento,
 
-      p_apellido: cliente.apellido,
+      p_nombre:
+        c.nombre || null,
+
+      p_apellido:
+        c.apellido || null,
 
       p_celular:
-        cliente.celular || null,
+        c.celular || null,
 
       p_fecha_nacimiento:
-        cliente.fechaNacimiento || null,
+        c.fechaNacimiento || null,
 
+      // DNI
       p_dni:
-        cliente.dni || null,
+        c.dni || null,
+
+      p_dig_ruc:
+        c.digRuc || null,
 
       p_apellido_paterno:
-        cliente.apellidoPaterno || null,
+        c.apellidoPaterno || null,
 
       p_apellido_materno:
-        cliente.apellidoMaterno || null,
+        c.apellidoMaterno || null,
 
       p_nombre_completo:
-        cliente.nombreCompleto || null,
+        c.nombreCompleto || null,
 
       p_direccion:
-        cliente.direccion || null,
+        c.direccion || null,
 
       p_ubigeo:
-        cliente.ubigeo || null,
+        c.ubigeo || null,
+
+      p_ubigeo_nacimiento:
+        c.ubigeoNacimiento || null,
+
+      p_ubigeo_direccion:
+        c.ubigeoDireccion || null,
+
+      p_sexo:
+        c.sexo || null,
+
+      p_estado_civil:
+        c.estadoCivil || null,
+
+      p_madre:
+        c.madre || null,
+
+      p_padre:
+        c.padre || null,
+
+      // RUC
+      p_ruc:
+        c.ruc || null,
+
+      p_razon_social:
+        c.razonSocial || null,
+
+      p_nombre_comercial:
+        c.nombreComercial || null,
+
+      p_tipo_contribuyente:
+        c.tipoContribuyente || null,
+
+      p_estado_ruc:
+        c.estadoRuc || null,
+
+      p_condicion_ruc:
+        c.condicionRuc || null,
+
+      p_domicilio_fiscal:
+        c.domicilioFiscal || null,
+
+      p_fecha_inscripcion:
+        c.fechaInscripcion || null,
+
+      p_actividad_economica:
+        c.actividadEconomica || null,
+
+      p_sistema_contabilidad:
+        c.sistemaContabilidad || null,
+
+      p_afiliado_ple:
+        c.afiliadoPle || null,
+
+      p_emisor_electronico:
+        c.emisorElectronico || null,
+
+      p_comprobantes_electronicos:
+        c.comprobantesElectronicos || null,
+
+      p_padrones:
+        c.padrones || null,
+
+      p_cant_trabajadores:
+        c.cantTrabajadores || [],
+
+      p_representantes:
+        c.representantes || [],
+
+      p_historico:
+        c.historico || null,
     }
   );
 
@@ -1146,40 +1453,122 @@ export async function crearCliente(
 
 export async function actualizarCliente(
   token: string,
-  cliente: ClienteDB
+  id: string,
+  c: DatosClienteFormulario
 ) {
   const { error } = await supabase.rpc(
     "actualizar_cliente",
     {
       p_token: token,
 
-      p_id: cliente.id,
+      p_id: id,
 
-      p_nombre: cliente.nombre,
+      p_tipo_documento:
+        c.tipoDocumento,
 
-      p_apellido: cliente.apellido,
+      p_nombre:
+        c.nombre || null,
 
-      p_celular: cliente.celular,
+      p_apellido:
+        c.apellido || null,
+
+      p_celular:
+        c.celular || null,
 
       p_fecha_nacimiento:
-        cliente.fecha_nacimiento,
+        c.fechaNacimiento || null,
 
-      p_dni: cliente.dni,
+      // DNI
+      p_dni:
+        c.dni || null,
+
+      p_dig_ruc:
+        c.digRuc || null,
 
       p_apellido_paterno:
-        cliente.apellido_paterno,
+        c.apellidoPaterno || null,
 
       p_apellido_materno:
-        cliente.apellido_materno,
+        c.apellidoMaterno || null,
 
       p_nombre_completo:
-        cliente.nombre_completo,
+        c.nombreCompleto || null,
 
       p_direccion:
-        cliente.direccion,
+        c.direccion || null,
 
       p_ubigeo:
-        cliente.ubigeo,
+        c.ubigeo || null,
+
+      p_ubigeo_nacimiento:
+        c.ubigeoNacimiento || null,
+
+      p_ubigeo_direccion:
+        c.ubigeoDireccion || null,
+
+      p_sexo:
+        c.sexo || null,
+
+      p_estado_civil:
+        c.estadoCivil || null,
+
+      p_madre:
+        c.madre || null,
+
+      p_padre:
+        c.padre || null,
+
+      // RUC
+      p_ruc:
+        c.ruc || null,
+
+      p_razon_social:
+        c.razonSocial || null,
+
+      p_nombre_comercial:
+        c.nombreComercial || null,
+
+      p_tipo_contribuyente:
+        c.tipoContribuyente || null,
+
+      p_estado_ruc:
+        c.estadoRuc || null,
+
+      p_condicion_ruc:
+        c.condicionRuc || null,
+
+      p_domicilio_fiscal:
+        c.domicilioFiscal || null,
+
+      p_fecha_inscripcion:
+        c.fechaInscripcion || null,
+
+      p_actividad_economica:
+        c.actividadEconomica || null,
+
+      p_sistema_contabilidad:
+        c.sistemaContabilidad || null,
+
+      p_afiliado_ple:
+        c.afiliadoPle || null,
+
+      p_emisor_electronico:
+        c.emisorElectronico || null,
+
+      p_comprobantes_electronicos:
+        c.comprobantesElectronicos || null,
+
+      p_padrones:
+        c.padrones || null,
+
+      p_cant_trabajadores:
+        c.cantTrabajadores || [],
+
+      p_representantes:
+        c.representantes || [],
+
+      p_historico:
+        c.historico || null,
     }
   );
 

@@ -1,130 +1,354 @@
-import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
   Pencil,
   Trash2,
   X,
-  UserRound,
+  User,
+  Building2,
   Phone,
-  CalendarDays,
-  Cake,
+  Calendar,
   MapPin,
-  IdCard,
+  FileText,
   Loader2,
   CheckCircle2,
   AlertCircle,
+  Users,
+  BriefcaseBusiness,
+  History,
+  RefreshCw,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
-  fetchClientes,
-  buscarClientePorDni,
-  crearCliente,
   actualizarCliente,
-  eliminarCliente,
+  buscarClientePorDocumento,
   consultarDni,
-  convertirFechaDNI,
+  consultarRuc,
+  crearCliente,
+  eliminarCliente,
+  fetchClientes,
   type ClienteDB,
+  type DatosDNI,
+  type DatosRUC,
 } from "../../lib/adminApi";
 
-import { useAuth } from "../auth/AuthContext";
+type TipoDocumento = "DNI" | "RUC";
 
-type ModoModal = "crear" | "editar";
+interface TrabajadorRUC {
+  numPensionista: string;
+  numPrestadoresServicio: string;
+  numTrabajadores: string;
+  periodo: string;
+}
+
+interface RepresentanteRUC {
+  cargo: string;
+  fechaDesde: string;
+  nombre: string;
+  numDocumento: string;
+  tipDocumento: string;
+}
+
+interface BajaHistoricaRUC {
+  fechaBaja: string;
+  razonSocial: string;
+}
+
+interface HistoricoRUC {
+  condiciones: unknown[];
+  bajas: BajaHistoricaRUC[];
+}
+
+interface DatosClienteFormulario {
+  tipoDocumento: TipoDocumento;
+  numeroDoc: string;
+
+  // Datos generales
+  nombre: string;
+  apellido: string;
+  celular: string;
+  fechaNacimiento: string;
+
+  // DNI
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  nombreCompleto: string;
+  digRuc: string;
+  ubigeoNacimiento: string;
+  ubigeoDireccion: string;
+  direccion: string;
+  sexo: string;
+  estadoCivil: string;
+  madre: string;
+  padre: string;
+
+  // RUC
+  razonSocial: string;
+  nombreComercial: string;
+  tipoContribuyente: string;
+  estadoRuc: string;
+  condicionRuc: string;
+  fechaInscripcion: string;
+  actividadEconomica: string;
+  sistemaContabilidad: string;
+  afiliadoPle: string;
+  emisorElectronico: string;
+  comprobantesElectronicos: string;
+  padrones: string;
+
+  cantTrabajadores: TrabajadorRUC[];
+  representantes: RepresentanteRUC[];
+  historico: HistoricoRUC | null;
+}
+
+const formularioInicial: DatosClienteFormulario = {
+  tipoDocumento: "DNI",
+  numeroDoc: "",
+
+  nombre: "",
+  apellido: "",
+  celular: "",
+  fechaNacimiento: "",
+
+  apellidoPaterno: "",
+  apellidoMaterno: "",
+  nombreCompleto: "",
+  digRuc: "",
+  ubigeoNacimiento: "",
+  ubigeoDireccion: "",
+  direccion: "",
+  sexo: "",
+  estadoCivil: "",
+  madre: "",
+  padre: "",
+
+  razonSocial: "",
+  nombreComercial: "",
+  tipoContribuyente: "",
+  estadoRuc: "",
+  condicionRuc: "",
+  fechaInscripcion: "",
+  actividadEconomica: "",
+  sistemaContabilidad: "",
+  afiliadoPle: "",
+  emisorElectronico: "",
+  comprobantesElectronicos: "",
+  padrones: "",
+
+  cantTrabajadores: [],
+  representantes: [],
+  historico: null,
+};
+
+function convertirFechaDNI(fecha: string | null | undefined): string {
+  if (!fecha) return "";
+
+  const limpia = fecha.trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(limpia)) {
+    return limpia;
+  }
+
+  const partes = limpia.split("/");
+
+  if (partes.length !== 3) {
+    return limpia;
+  }
+
+  const [dia, mes, anio] = partes;
+
+  if (!dia || !mes || !anio) {
+    return limpia;
+  }
+
+  return `${anio}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}`;
+}
+
+function formatearFecha(fecha: string | null | undefined): string {
+  if (!fecha) return "-";
+
+  const limpia = fecha.trim();
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(limpia)) {
+    return limpia;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(limpia)) {
+    const [anio, mes, dia] = limpia.split("-");
+    return `${dia}/${mes}/${anio}`;
+  }
+
+  return limpia;
+}
+
+function textoSeguro(valor: unknown): string {
+  if (valor === null || valor === undefined) {
+    return "";
+  }
+
+  return String(valor);
+}
+
+function normalizarTrabajadores(
+  valor: unknown
+): TrabajadorRUC[] {
+  if (!Array.isArray(valor)) {
+    return [];
+  }
+
+  return valor.map((item: any) => ({
+    numPensionista: textoSeguro(item?.numPensionista),
+    numPrestadoresServicio: textoSeguro(item?.numPrestadoresServicio),
+    numTrabajadores: textoSeguro(item?.numTrabajadores),
+    periodo: textoSeguro(item?.periodo),
+  }));
+}
+
+function normalizarRepresentantes(
+  valor: unknown
+): RepresentanteRUC[] {
+  if (!Array.isArray(valor)) {
+    return [];
+  }
+
+  return valor.map((item: any) => ({
+    cargo: textoSeguro(item?.cargo),
+    fechaDesde: textoSeguro(item?.fechaDesde),
+    nombre: textoSeguro(item?.nombre),
+    numDocumento: textoSeguro(item?.numDocumento),
+    tipDocumento: textoSeguro(item?.tipDocumento),
+  }));
+}
+
+function normalizarHistorico(valor: unknown): HistoricoRUC | null {
+  if (!valor || typeof valor !== "object") {
+    return null;
+  }
+
+  const data = valor as any;
+
+  return {
+    condiciones: Array.isArray(data.condiciones)
+      ? data.condiciones
+      : [],
+    bajas: Array.isArray(data.bajas)
+      ? data.bajas.map((item: any) => ({
+          fechaBaja: textoSeguro(item?.fechaBaja),
+          razonSocial: textoSeguro(item?.razonSocial),
+        }))
+      : [],
+  };
+}
+
+function Campo({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  disabled = false,
+  readOnly = false,
+}: {
+  label: string;
+  value: string;
+  onChange?: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+  disabled?: boolean;
+  readOnly?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs font-medium text-gray-600">
+        {label}
+      </label>
+
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        readOnly={readOnly}
+        className={`w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 ${
+          disabled
+            ? "cursor-not-allowed bg-gray-100 text-gray-500"
+            : "focus:border-black focus:ring-2 focus:ring-black/5"
+        }`}
+      />
+    </div>
+  );
+}
+
+function CampoGrande({
+  label,
+  value,
+  onChange,
+  placeholder,
+  rows = 3,
+}: {
+  label: string;
+  value: string;
+  onChange?: (value: string) => void;
+  placeholder?: string;
+  rows?: number;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs font-medium text-gray-600">
+        {label}
+      </label>
+
+      <textarea
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-black focus:ring-2 focus:ring-black/5"
+      />
+    </div>
+  );
+}
 
 export function ClientesTab() {
-  /*
-   * ============================================================
-   * AUTENTICACIÓN
-   * ============================================================
-   *
-   * No dependemos de ToastProvider.
-   *
-   * El AuthContext puede exponer el token directamente o dentro
-   * del usuario. Manejamos ambas posibilidades para que el módulo
-   * sea compatible con tu sistema actual.
-   */
-  const auth = useAuth() as unknown as {
-    usuario?: {
-      token?: string | null;
-      session_id?: string | null;
-      sessionId?: string | null;
-    } | null;
-    token?: string | null;
-  };
-
-  const usuario = auth.usuario;
-
-  const token =
-    auth.token ||
-    usuario?.token ||
-    usuario?.session_id ||
-    usuario?.sessionId ||
-    "";
-
-  /*
-   * ============================================================
-   * ESTADOS
-   * ============================================================
-   */
-
   const [clientes, setClientes] = useState<ClienteDB[]>([]);
+  const [cargando, setCargando] = useState(true);
+
   const [busqueda, setBusqueda] = useState("");
 
-  const [cargando, setCargando] = useState(true);
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [pasoModal, setPasoModal] = useState<TipoDocumento>("DNI");
+
+  const [modoEdicion, setModoEdicion] = useState<ClienteDB | null>(
+    null
+  );
+
+  const [formulario, setFormulario] =
+    useState<DatosClienteFormulario>(formularioInicial);
+
+  const [buscando, setBuscando] = useState(false);
   const [guardando, setGuardando] = useState(false);
-  const [buscandoDni, setBuscandoDni] = useState(false);
   const [eliminando, setEliminando] = useState(false);
 
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [modoModal, setModoModal] = useState<ModoModal>("crear");
-
-  const [clienteEditando, setClienteEditando] =
-    useState<ClienteDB | null>(null);
-
-  /*
-   * Datos del cliente
-   */
-  const [dni, setDni] = useState("");
-  const [nombre, setNombre] = useState("");
-  const [apellido, setApellido] = useState("");
-  const [apellidoPaterno, setApellidoPaterno] = useState("");
-  const [apellidoMaterno, setApellidoMaterno] = useState("");
-  const [nombreCompleto, setNombreCompleto] = useState("");
-  const [celular, setCelular] = useState("");
-  const [fechaNacimiento, setFechaNacimiento] = useState("");
-  const [direccion, setDireccion] = useState("");
-  const [ubigeo, setUbigeo] = useState("");
-
-  /*
-   * Control de DNI existente
-   */
-  const [clienteYaRegistrado, setClienteYaRegistrado] =
-    useState(false);
-
-  /*
-   * Mensajes internos.
-   * Reemplazan ToastProvider para no depender de un archivo
-   * que actualmente no existe en el proyecto.
-   */
   const [mensajeExito, setMensajeExito] = useState("");
   const [mensajeError, setMensajeError] = useState("");
 
-  /*
-   * ============================================================
-   * CARGAR CLIENTES
-   * ============================================================
-   */
+  const [confirmarEliminar, setConfirmarEliminar] = useState(false);
+
+  useEffect(() => {
+    cargarClientes();
+  }, []);
 
   async function cargarClientes() {
     try {
       setCargando(true);
-      setMensajeError("");
 
       const data = await fetchClientes();
 
-      setClientes(data);
+      setClientes(data ?? []);
     } catch (error) {
-      console.error("Error al cargar clientes:", error);
+      console.error("Error cargando clientes:", error);
 
       setMensajeError(
         "No se pudieron cargar los clientes."
@@ -134,308 +358,465 @@ export function ClientesTab() {
     }
   }
 
-  useEffect(() => {
-    void cargarClientes();
-  }, []);
-
-  /*
-   * ============================================================
-   * FILTRO
-   * ============================================================
-   */
-
-  const clientesFiltrados = useMemo(() => {
-    const texto = busqueda.trim().toLowerCase();
-
-    if (!texto) {
-      return clientes;
-    }
-
-    return clientes.filter((cliente) => {
-      return (
-        cliente.nombre
-          ?.toLowerCase()
-          .includes(texto) ||
-        cliente.apellido
-          ?.toLowerCase()
-          .includes(texto) ||
-        cliente.nombre_completo
-          ?.toLowerCase()
-          .includes(texto) ||
-        cliente.celular
-          ?.toLowerCase()
-          .includes(texto) ||
-        cliente.dni
-          ?.toLowerCase()
-          .includes(texto)
-      );
-    });
-  }, [clientes, busqueda]);
-
-  /*
-   * ============================================================
-   * LIMPIAR MENSAJES
-   * ============================================================
-   */
-
   function limpiarMensajes() {
     setMensajeExito("");
     setMensajeError("");
   }
 
-  /*
-   * ============================================================
-   * ABRIR MODAL CREAR
-   * ============================================================
-   */
+  function limpiarFormulario() {
+    setFormulario({
+      ...formularioInicial,
+      tipoDocumento: pasoModal,
+    });
+
+    setModoEdicion(null);
+    setConfirmarEliminar(false);
+    limpiarMensajes();
+  }
 
   function abrirCrear() {
     limpiarMensajes();
 
-    setModoModal("crear");
-    setClienteEditando(null);
+    setModoEdicion(null);
 
-    setDni("");
-    setNombre("");
-    setApellido("");
-    setApellidoPaterno("");
-    setApellidoMaterno("");
-    setNombreCompleto("");
-    setCelular("");
-    setFechaNacimiento("");
-    setDireccion("");
-    setUbigeo("");
+    setPasoModal("DNI");
 
-    setClienteYaRegistrado(false);
+    setFormulario({
+      ...formularioInicial,
+      tipoDocumento: "DNI",
+    });
 
+    setConfirmarEliminar(false);
     setModalAbierto(true);
   }
-
-  /*
-   * ============================================================
-   * ABRIR MODAL EDITAR
-   * ============================================================
-   */
-
-  function abrirEditar(cliente: ClienteDB) {
-    limpiarMensajes();
-
-    setModoModal("editar");
-    setClienteEditando(cliente);
-
-    setDni(cliente.dni ?? "");
-    setNombre(cliente.nombre ?? "");
-    setApellido(cliente.apellido ?? "");
-    setApellidoPaterno(cliente.apellido_paterno ?? "");
-    setApellidoMaterno(cliente.apellido_materno ?? "");
-    setNombreCompleto(cliente.nombre_completo ?? "");
-    setCelular(cliente.celular ?? "");
-    setFechaNacimiento(cliente.fecha_nacimiento ?? "");
-    setDireccion(cliente.direccion ?? "");
-    setUbigeo(cliente.ubigeo ?? "");
-
-    /*
-     * En edición no debemos bloquear el botón guardar.
-     */
-    setClienteYaRegistrado(false);
-
-    setModalAbierto(true);
-  }
-
-  /*
-   * ============================================================
-   * CERRAR MODAL
-   * ============================================================
-   */
 
   function cerrarModal() {
-    if (guardando || buscandoDni || eliminando) {
+    if (guardando || buscando || eliminando) {
       return;
     }
 
     setModalAbierto(false);
-    setClienteEditando(null);
-    limpiarMensajes();
+    limpiarFormulario();
   }
 
-  /*
-   * ============================================================
-   * RELLENAR DESDE BASE DE DATOS
-   * ============================================================
-   */
+  function cambiarTipoDocumento(tipo: TipoDocumento) {
+    if (modoEdicion) {
+      return;
+    }
 
-  function rellenarDesdeBaseDatos(cliente: ClienteDB) {
-    setDni(cliente.dni ?? "");
-    setNombre(cliente.nombre ?? "");
-    setApellido(cliente.apellido ?? "");
-    setApellidoPaterno(cliente.apellido_paterno ?? "");
-    setApellidoMaterno(cliente.apellido_materno ?? "");
-    setNombreCompleto(cliente.nombre_completo ?? "");
-    setCelular(cliente.celular ?? "");
-    setFechaNacimiento(cliente.fecha_nacimiento ?? "");
-    setDireccion(cliente.direccion ?? "");
-    setUbigeo(cliente.ubigeo ?? "");
-  }
-
-  /*
-   * ============================================================
-   * BUSCAR DNI
-   * ============================================================
-   *
-   * 1. Busca primero en Supabase.
-   * 2. Si existe, NO llama a API Manager.
-   * 3. Si no existe, llama a consultar-dni.
-   */
-
-  async function buscarPorDni() {
     limpiarMensajes();
 
-    const dniLimpio = dni.replace(/\D/g, "");
+    setPasoModal(tipo);
 
-    if (!/^\d{8}$/.test(dniLimpio)) {
+    setFormulario({
+      ...formularioInicial,
+      tipoDocumento: tipo,
+    });
+  }
+
+  function actualizarCampo(
+    campo: keyof DatosClienteFormulario,
+    valor: string
+  ) {
+    setFormulario((actual) => ({
+      ...actual,
+      [campo]: valor,
+    }));
+  }
+
+  function cargarClienteEnFormulario(cliente: ClienteDB) {
+    const tipo: TipoDocumento =
+      cliente.tipo_documento === "RUC" ? "RUC" : "DNI";
+
+    const trabajadores = normalizarTrabajadores(
+      (cliente as any).cant_trabajadores
+    );
+
+    const representantes = normalizarRepresentantes(
+      (cliente as any).representantes
+    );
+
+    const historico = normalizarHistorico(
+      (cliente as any).historico
+    );
+
+    setPasoModal(tipo);
+
+    setFormulario({
+      tipoDocumento: tipo,
+      numeroDoc:
+        tipo === "RUC"
+          ? textoSeguro((cliente as any).ruc)
+          : textoSeguro((cliente as any).dni),
+
+      nombre: textoSeguro(cliente.nombre),
+      apellido: textoSeguro(cliente.apellido),
+      celular: textoSeguro(cliente.celular),
+      fechaNacimiento: convertirFechaDNI(
+        textoSeguro(cliente.fecha_nacimiento)
+      ),
+
+      apellidoPaterno: textoSeguro(
+        (cliente as any).apellido_paterno
+      ),
+      apellidoMaterno: textoSeguro(
+        (cliente as any).apellido_materno
+      ),
+      nombreCompleto: textoSeguro(
+        (cliente as any).nombre_completo
+      ),
+      digRuc: textoSeguro((cliente as any).dig_ruc),
+
+      ubigeoNacimiento: textoSeguro(
+        (cliente as any).ubigeo_nacimiento
+      ),
+      ubigeoDireccion: textoSeguro(
+        (cliente as any).ubigeo_direccion ?? cliente.ubigeo
+      ),
+
+      direccion: textoSeguro(cliente.direccion),
+
+      sexo: textoSeguro((cliente as any).sexo),
+      estadoCivil: textoSeguro(
+        (cliente as any).estado_civil
+      ),
+      madre: textoSeguro((cliente as any).madre),
+      padre: textoSeguro((cliente as any).padre),
+
+      razonSocial: textoSeguro(cliente.razon_social),
+      nombreComercial: textoSeguro(
+        cliente.nombre_comercial
+      ),
+      tipoContribuyente: textoSeguro(
+        (cliente as any).tipo_contribuyente
+      ),
+      estadoRuc: textoSeguro(cliente.estado_ruc),
+      condicionRuc: textoSeguro(cliente.condicion_ruc),
+
+      fechaInscripcion: textoSeguro(
+        (cliente as any).fecha_inscripcion
+      ),
+      actividadEconomica: textoSeguro(
+        (cliente as any).actividad_economica
+      ),
+      sistemaContabilidad: textoSeguro(
+        (cliente as any).sistema_contabilidad
+      ),
+      afiliadoPle: textoSeguro(
+        (cliente as any).afiliado_ple
+      ),
+      emisorElectronico: textoSeguro(
+        (cliente as any).emisor_electronico
+      ),
+      comprobantesElectronicos: textoSeguro(
+        (cliente as any).comprobantes_electronicos
+      ),
+      padrones: textoSeguro((cliente as any).padrones),
+
+      cantTrabajadores: trabajadores,
+      representantes,
+      historico,
+    });
+
+    setModoEdicion(cliente);
+    setModalAbierto(true);
+  }
+
+  function abrirEditar(cliente: ClienteDB) {
+    limpiarMensajes();
+
+    cargarClienteEnFormulario(cliente);
+
+    setMensajeExito(
+      "Cliente cargado. Puedes revisar y editar sus datos."
+    );
+  }
+
+  async function buscar() {
+    limpiarMensajes();
+
+    const limpio = formulario.numeroDoc.replace(/\D/g, "");
+
+    const longitudEsperada =
+      pasoModal === "DNI" ? 8 : 11;
+
+    if (limpio.length !== longitudEsperada) {
       setMensajeError(
-        "El DNI debe contener exactamente 8 dígitos."
+        pasoModal === "DNI"
+          ? "El DNI debe tener 8 dígitos."
+          : "El RUC debe tener 11 dígitos."
       );
+
       return;
     }
 
     try {
-      setBuscandoDni(true);
+      setBuscando(true);
 
       /*
-       * PRIMERO: buscar en nuestra propia base de datos.
+       * ============================================================
+       * 1. PRIMERO BUSCAMOS EN NUESTRA BASE DE DATOS
+       * ============================================================
+       *
+       * Si existe:
+       * - NO consumimos API externa.
+       * - Cargamos el cliente.
+       * - Entramos automáticamente en edición.
        */
-      const clienteExistente =
-        await buscarClientePorDni(dniLimpio);
 
-      if (clienteExistente) {
-        rellenarDesdeBaseDatos(clienteExistente);
+      const existente = await buscarClientePorDocumento(
+        pasoModal,
+        limpio
+      );
 
-        setClienteYaRegistrado(true);
+      if (existente) {
+        cargarClienteEnFormulario(existente);
 
         setMensajeExito(
-          "Este cliente ya está registrado. No se realizará una nueva consulta."
+          "Este cliente ya está registrado. No se consultó la API externa. Hemos cargado los datos guardados para que puedas revisarlos o editarlos."
         );
 
         return;
       }
 
       /*
-       * SEGUNDO: solamente si NO existe en nuestra DB,
-       * consultamos API Manager mediante Edge Function.
+       * ============================================================
+       * 2. SI NO EXISTE EN DB, CONSULTAMOS LA API
+       * ============================================================
+       *
+       * IMPORTANTE (FIX):
+       * consultarDni() / consultarRuc() en adminApi.ts YA lanzan
+       * un throw si la API externa no encontró información, y si
+       * tienen éxito devuelven el objeto de datos "pelado"
+       * (DatosDNI / DatosRUC), NO un wrapper { encontrado, cliente }.
+       *
+       * Antes este código esperaba `respuesta.encontrado` y
+       * `respuesta.cliente` / `respuesta.empresa`, propiedades que
+       * nunca existen en el objeto retornado, por lo que SIEMPRE
+       * se mostraba "No se encontró información..." incluso cuando
+       * la API sí devolvía los datos correctamente.
        */
-      const resultado = await consultarDni(dniLimpio);
 
-      setDni(resultado.dni);
+      setModoEdicion(null);
 
-      setApellidoPaterno(
-        resultado.apellido_paterno || ""
+      if (pasoModal === "DNI") {
+        const data = await consultarDni(limpio);
+
+        setFormulario((actual) => ({
+          ...actual,
+
+          tipoDocumento: "DNI",
+          numeroDoc:
+            textoSeguro(data.dni) || limpio,
+
+          nombre:
+            textoSeguro(data.nombres) ||
+            textoSeguro(data.nombre_completo),
+
+          apellido:
+            [
+              textoSeguro(data.apellido_paterno),
+              textoSeguro(data.apellido_materno),
+            ]
+              .filter(Boolean)
+              .join(" "),
+
+          apellidoPaterno:
+            textoSeguro(data.apellido_paterno),
+
+          apellidoMaterno:
+            textoSeguro(data.apellido_materno),
+
+          nombreCompleto:
+            textoSeguro(data.nombre_completo),
+
+          fechaNacimiento:
+            convertirFechaDNI(
+              textoSeguro(data.fecha_nacimiento)
+            ),
+
+          digRuc:
+            textoSeguro((data as any).dig_ruc),
+
+          ubigeoNacimiento:
+            textoSeguro(
+              (data as any).ubigeo_nacimiento
+            ),
+
+          ubigeoDireccion:
+            textoSeguro(
+              (data as any).ubigeo_direccion ??
+                (data as any).ubigeo
+            ),
+
+          direccion:
+            textoSeguro(data.direccion),
+
+          sexo:
+            textoSeguro((data as any).sexo),
+
+          estadoCivil:
+            textoSeguro((data as any).estado_civil),
+
+          madre:
+            textoSeguro((data as any).madre),
+
+          padre:
+            textoSeguro((data as any).padre),
+        }));
+
+        setMensajeExito(
+          "Datos encontrados en la API. Revisa la información y guarda el cliente."
+        );
+      } else {
+        const data = await consultarRuc(limpio);
+
+        setFormulario((actual) => ({
+          ...actual,
+
+          tipoDocumento: "RUC",
+          numeroDoc:
+            textoSeguro(data.ruc) || limpio,
+
+          razonSocial:
+            textoSeguro(data.razon_social),
+
+          nombreComercial:
+            textoSeguro(data.nombre_comercial),
+
+          tipoContribuyente:
+            textoSeguro(data.tipo_contribuyente),
+
+          estadoRuc:
+            textoSeguro(data.estado),
+
+          condicionRuc:
+            textoSeguro(data.condicion),
+
+          direccion:
+            textoSeguro(
+              (data as any).domicilio_fiscal ??
+                (data as any).direccion
+            ),
+
+          fechaInscripcion:
+            textoSeguro(
+              (data as any).fecha_inscripcion
+            ),
+
+          actividadEconomica:
+            textoSeguro(
+              (data as any).actividad_economica
+            ),
+
+          sistemaContabilidad:
+            textoSeguro(
+              (data as any).sistema_contabilidad
+            ),
+
+          afiliadoPle:
+            textoSeguro(
+              (data as any).afiliado_ple
+            ),
+
+          emisorElectronico:
+            textoSeguro(
+              (data as any).emisor_electronico
+            ),
+
+          comprobantesElectronicos:
+            textoSeguro(
+              (data as any).comprobantes_electronicos
+            ),
+
+          padrones:
+            textoSeguro(
+              (data as any).padrones
+            ),
+
+          cantTrabajadores:
+            normalizarTrabajadores(
+              (data as any).cant_trabajadores
+            ),
+
+          representantes:
+            normalizarRepresentantes(
+              (data as any).representantes
+            ),
+
+          historico:
+            normalizarHistorico(
+              (data as any).historico
+            ),
+        }));
+
+        setMensajeExito(
+          "Datos encontrados en la API. Revisa la información y guarda el cliente."
+        );
+      }
+    } catch (error: any) {
+      console.error("Error buscando cliente:", error);
+
+      const mensaje = textoSeguro(error?.message);
+
+      setMensajeError(
+        mensaje ||
+          "Ocurrió un error durante la búsqueda. Intenta nuevamente."
       );
-
-      setApellidoMaterno(
-        resultado.apellido_materno || ""
-      );
-
-      setNombre(resultado.nombres || "");
-
-      setApellido(
-        [
-          resultado.apellido_paterno,
-          resultado.apellido_materno,
-        ]
-          .filter(Boolean)
-          .join(" ")
-      );
-
-      setNombreCompleto(
-        resultado.nombre_completo || ""
-      );
-
-      setFechaNacimiento(
-        convertirFechaDNI(
-          resultado.fecha_nacimiento
-        ) || ""
-      );
-
-      setDireccion(resultado.direccion || "");
-      setUbigeo(resultado.ubigeo || "");
-
-      setClienteYaRegistrado(false);
-
-      setMensajeExito(
-        "Datos encontrados correctamente. Revisa la información y guarda el cliente."
-      );
-    } catch (error) {
-      console.error("Error buscando DNI:", error);
-
-      const mensaje =
-        error instanceof Error
-          ? error.message
-          : "No se pudo consultar el DNI.";
-
-      setMensajeError(mensaje);
-      setClienteYaRegistrado(false);
     } finally {
-      setBuscandoDni(false);
+      setBuscando(false);
     }
   }
-
-  /*
-   * ============================================================
-   * GUARDAR CLIENTE
-   * ============================================================
-   */
 
   async function guardar() {
     limpiarMensajes();
 
-    const dniLimpio = dni.replace(/\D/g, "");
+    const documento = formulario.numeroDoc
+      .replace(/\D/g, "");
 
-    /*
-     * Validaciones
-     */
-    if (!nombre.trim()) {
+    if (!documento) {
       setMensajeError(
-        "El nombre del cliente es obligatorio."
+        "Ingresa un DNI o RUC."
       );
+
       return;
     }
 
-    if (!apellido.trim()) {
+    const longitudEsperada =
+      formulario.tipoDocumento === "DNI" ? 8 : 11;
+
+    if (documento.length !== longitudEsperada) {
       setMensajeError(
-        "El apellido del cliente es obligatorio."
+        formulario.tipoDocumento === "DNI"
+          ? "El DNI debe tener 8 dígitos."
+          : "El RUC debe tener 11 dígitos."
       );
+
       return;
     }
 
-    if (dniLimpio && !/^\d{8}$/.test(dniLimpio)) {
-      setMensajeError(
-        "El DNI debe contener exactamente 8 dígitos."
-      );
-      return;
+    if (formulario.tipoDocumento === "DNI") {
+      if (
+        !formulario.nombreCompleto &&
+        !formulario.nombre &&
+        !formulario.apellido
+      ) {
+        setMensajeError(
+          "Completa los datos del cliente antes de guardar."
+        );
+
+        return;
+      }
     }
 
-    /*
-     * Si estamos creando y ya sabemos que existe,
-     * no permitimos duplicarlo.
-     */
     if (
-      modoModal === "crear" &&
-      clienteYaRegistrado
+      formulario.tipoDocumento === "RUC" &&
+      !formulario.razonSocial
     ) {
       setMensajeError(
-        "Este cliente ya está registrado. No se puede crear nuevamente."
+        "La razón social es obligatoria para un RUC."
       );
-      return;
-    }
 
-    /*
-     * El token es necesario para los RPC de administración.
-     */
-    if (!token) {
-      setMensajeError(
-        "No se encontró una sesión válida. Vuelve a iniciar sesión."
-      );
       return;
     }
 
@@ -443,218 +824,172 @@ export function ClientesTab() {
       setGuardando(true);
 
       /*
-       * ========================================================
-       * EDITAR
-       * ========================================================
+       * Verificación adicional contra duplicados.
+       *
+       * Esto se hace incluso antes del RPC.
        */
+      const existente =
+        await buscarClientePorDocumento(
+          formulario.tipoDocumento,
+          documento
+        );
 
       if (
-        modoModal === "editar" &&
-        clienteEditando
+        existente &&
+        (!modoEdicion ||
+          existente.id !== modoEdicion.id)
       ) {
-        /*
-         * Si se cambió el DNI durante la edición,
-         * comprobamos que no pertenezca a otro cliente.
-         */
-        if (
-          dniLimpio &&
-          dniLimpio !== clienteEditando.dni
-        ) {
-          const otroCliente =
-            await buscarClientePorDni(dniLimpio);
+        setMensajeError(
+          "Este DNI/RUC ya está registrado. Se cargaron los datos existentes para que puedas editarlos."
+        );
 
-          if (
-            otroCliente &&
-            otroCliente.id !== clienteEditando.id
-          ) {
-            setMensajeError(
-              "Ese DNI ya pertenece a otro cliente."
-            );
-            return;
-          }
-        }
+        cargarClienteEnFormulario(existente);
 
-        const clienteActualizado: ClienteDB = {
-          ...clienteEditando,
+        return;
+      }
 
-          nombre: nombre.trim(),
-          apellido: apellido.trim(),
-          celular:
-            celular.trim() || null,
-          fecha_nacimiento:
-            fechaNacimiento || null,
+      const datos = {
+        tipo_documento: formulario.tipoDocumento,
 
-          dni:
-            dniLimpio || null,
+        dni:
+          formulario.tipoDocumento === "DNI"
+            ? documento
+            : null,
 
-          apellido_paterno:
-            apellidoPaterno.trim() || null,
+        ruc:
+          formulario.tipoDocumento === "RUC"
+            ? documento
+            : null,
 
-          apellido_materno:
-            apellidoMaterno.trim() || null,
+        nombre: formulario.nombre,
+        apellido: formulario.apellido,
+        celular: formulario.celular || null,
+        fecha_nacimiento:
+          formulario.fechaNacimiento || null,
 
-          nombre_completo:
-            nombreCompleto.trim() || null,
+        apellido_paterno:
+          formulario.apellidoPaterno || null,
 
-          direccion:
-            direccion.trim() || null,
+        apellido_materno:
+          formulario.apellidoMaterno || null,
 
-          ubigeo:
-            ubigeo.trim() || null,
-        };
+        nombre_completo:
+          formulario.nombreCompleto || null,
 
+        dig_ruc:
+          formulario.digRuc || null,
+
+        ubigeo_nacimiento:
+          formulario.ubigeoNacimiento || null,
+
+        ubigeo_direccion:
+          formulario.ubigeoDireccion || null,
+
+        direccion:
+          formulario.direccion || null,
+
+        sexo:
+          formulario.sexo || null,
+
+        estado_civil:
+          formulario.estadoCivil || null,
+
+        madre:
+          formulario.madre || null,
+
+        padre:
+          formulario.padre || null,
+
+        razon_social:
+          formulario.razonSocial || null,
+
+        nombre_comercial:
+          formulario.nombreComercial || null,
+
+        tipo_contribuyente:
+          formulario.tipoContribuyente || null,
+
+        estado_ruc:
+          formulario.estadoRuc || null,
+
+        condicion_ruc:
+          formulario.condicionRuc || null,
+
+        fecha_inscripcion:
+          formulario.fechaInscripcion || null,
+
+        actividad_economica:
+          formulario.actividadEconomica || null,
+
+        sistema_contabilidad:
+          formulario.sistemaContabilidad || null,
+
+        afiliado_ple:
+          formulario.afiliadoPle || null,
+
+        emisor_electronico:
+          formulario.emisorElectronico || null,
+
+        comprobantes_electronicos:
+          formulario.comprobantesElectronicos || null,
+
+        padrones:
+          formulario.padrones || null,
+
+        cant_trabajadores:
+          formulario.cantTrabajadores,
+
+        representantes:
+          formulario.representantes,
+
+        historico:
+          formulario.historico,
+      };
+
+      if (modoEdicion) {
         await actualizarCliente(
-          token,
-          clienteActualizado
+          modoEdicion.id,
+          datos as any
         );
 
         setMensajeExito(
           "Cliente actualizado correctamente."
         );
+      } else {
+        await crearCliente(datos as any);
 
-        await cargarClientes();
-
-        setTimeout(() => {
-          setModalAbierto(false);
-          setClienteEditando(null);
-          setMensajeExito("");
-        }, 700);
-
-        return;
+        setMensajeExito(
+          "Cliente registrado correctamente."
+        );
       }
-
-      /*
-       * ========================================================
-       * CREAR
-       * ========================================================
-       *
-       * Segunda comprobación del DNI justo antes del INSERT.
-       *
-       * Esto evita duplicados aunque dos procesos intenten
-       * guardar el mismo DNI al mismo tiempo.
-       */
-
-      if (dniLimpio) {
-        const clienteExistente =
-          await buscarClientePorDni(dniLimpio);
-
-        if (clienteExistente) {
-          rellenarDesdeBaseDatos(
-            clienteExistente
-          );
-
-          setClienteYaRegistrado(true);
-
-          setMensajeError(
-            "Este cliente ya estaba registrado. No se creó un duplicado."
-          );
-
-          await cargarClientes();
-
-          return;
-        }
-      }
-
-      /*
-       * Crear nuevo cliente.
-       */
-      await crearCliente(token, {
-        nombre: nombre.trim(),
-
-        apellido: apellido.trim(),
-
-        celular: celular.trim(),
-
-        fechaNacimiento:
-          fechaNacimiento || null,
-
-        dni:
-          dniLimpio || null,
-
-        apellidoPaterno:
-          apellidoPaterno.trim() || null,
-
-        apellidoMaterno:
-          apellidoMaterno.trim() || null,
-
-        nombreCompleto:
-          nombreCompleto.trim() || null,
-
-        direccion:
-          direccion.trim() || null,
-
-        ubigeo:
-          ubigeo.trim() || null,
-      });
-
-      setMensajeExito(
-        "Cliente registrado correctamente."
-      );
-
-      setClienteYaRegistrado(false);
 
       await cargarClientes();
 
       setTimeout(() => {
         setModalAbierto(false);
-        setMensajeExito("");
+        limpiarFormulario();
       }, 700);
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         "Error guardando cliente:",
         error
       );
 
-      /*
-       * PostgreSQL puede devolver un error por índice UNIQUE
-       * si el DNI ya existe.
-       */
-      const errorTexto =
-        error instanceof Error
-          ? error.message
-          : String(error);
+      const mensaje =
+        textoSeguro(error?.message) ||
+        textoSeguro(error);
 
       if (
-        errorTexto
-          .toLowerCase()
-          .includes("clientes_dni_unique")
-        ||
-        errorTexto
-          .toLowerCase()
-          .includes("duplicate")
-        ||
-        errorTexto
-          .toLowerCase()
-          .includes("unique")
+        mensaje.toLowerCase().includes("duplicate") ||
+        mensaje.toLowerCase().includes("unique") ||
+        mensaje.includes("23505")
       ) {
         setMensajeError(
-          "Ese DNI ya está registrado. No se puede crear un duplicado."
+          "No se pudo guardar porque ya existe un cliente con ese DNI/RUC."
         );
-
-        if (dniLimpio) {
-          try {
-            const existente =
-              await buscarClientePorDni(
-                dniLimpio
-              );
-
-            if (existente) {
-              rellenarDesdeBaseDatos(
-                existente
-              );
-
-              setClienteYaRegistrado(true);
-            }
-          } catch (buscarError) {
-            console.error(
-              "Error recuperando cliente duplicado:",
-              buscarError
-            );
-          }
-        }
       } else {
         setMensajeError(
-          errorTexto ||
+          mensaje ||
             "No se pudo guardar el cliente."
         );
       }
@@ -663,25 +998,8 @@ export function ClientesTab() {
     }
   }
 
-  /*
-   * ============================================================
-   * ELIMINAR CLIENTE
-   * ============================================================
-   */
-
-  async function eliminar(cliente: ClienteDB) {
-    const confirmar = window.confirm(
-      `¿Seguro que deseas eliminar a "${cliente.nombre_completo || `${cliente.nombre} ${cliente.apellido}`}"?`
-    );
-
-    if (!confirmar) {
-      return;
-    }
-
-    if (!token) {
-      setMensajeError(
-        "No se encontró una sesión válida."
-      );
+  async function eliminar() {
+    if (!modoEdicion) {
       return;
     }
 
@@ -689,349 +1007,472 @@ export function ClientesTab() {
       setEliminando(true);
       limpiarMensajes();
 
-      await eliminarCliente(
-        token,
-        cliente.id
-      );
+      await eliminarCliente(modoEdicion.id);
 
       setMensajeExito(
         "Cliente eliminado correctamente."
       );
 
       await cargarClientes();
-    } catch (error) {
+
+      setTimeout(() => {
+        setModalAbierto(false);
+        limpiarFormulario();
+      }, 700);
+    } catch (error: any) {
       console.error(
         "Error eliminando cliente:",
         error
       );
 
       setMensajeError(
-        error instanceof Error
-          ? error.message
-          : "No se pudo eliminar el cliente."
+        textoSeguro(error?.message) ||
+          "No se pudo eliminar el cliente."
       );
     } finally {
       setEliminando(false);
     }
   }
 
-  /*
-   * ============================================================
-   * FORMATEAR FECHA
-   * ============================================================
-   */
+  const clientesFiltrados = useMemo(() => {
+    const termino = busqueda
+      .trim()
+      .toLowerCase();
 
-  function mostrarFecha(
-    fecha: string | null
-  ) {
-    if (!fecha) {
-      return "—";
+    if (!termino) {
+      return clientes;
     }
 
-    const partes = fecha.split("-");
+    return clientes.filter((cliente) => {
+      const texto = [
+        cliente.nombre,
+        cliente.apellido,
+        cliente.celular,
+        cliente.dni,
+        cliente.ruc,
+        cliente.razon_social,
+        cliente.nombre_comercial,
+        cliente.nombre_completo,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
-    if (partes.length !== 3) {
-      return fecha;
-    }
-
-    return `${partes[2]}/${partes[1]}/${partes[0]}`;
-  }
-
-  /*
-   * ============================================================
-   * RENDER
-   * ============================================================
-   */
+      return texto.includes(termino);
+    });
+  }, [clientes, busqueda]);
 
   return (
-    <section className="space-y-6">
-      {/* ======================================================
-          ENCABEZADO
-          ====================================================== */}
+    <div className="w-full space-y-6">
+      {/* ========================================================= */}
+      {/* ENCABEZADO */}
+      {/* ========================================================= */}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="font-display text-2xl text-blanco">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
             Clientes
-          </h2>
+          </h1>
 
-          <p className="mt-1 font-body text-sm text-criss">
-            Administra los clientes registrados en Huaman Barber Club.
+          <p className="mt-1 text-sm text-gray-500">
+            Gestiona clientes, DNI, RUC y sus datos registrados.
           </p>
         </div>
 
         <button
           type="button"
           onClick={abrirCrear}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blanco px-4 py-2.5 font-body text-sm font-semibold text-negro transition hover:bg-gray-200"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800"
         >
-          <Plus size={18} />
+          <Plus size={17} />
           Nuevo cliente
         </button>
       </div>
 
-      {/* ======================================================
-          MENSAJE GLOBAL
-          ====================================================== */}
+      {/* ========================================================= */}
+      {/* BUSCADOR */}
+      {/* ========================================================= */}
 
-      {mensajeExito && (
-        <div className="flex items-start gap-3 rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-300">
-          <CheckCircle2
-            size={18}
-            className="mt-0.5 shrink-0"
-          />
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="relative flex-1">
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
 
-          <span>{mensajeExito}</span>
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) =>
+                setBusqueda(e.target.value)
+              }
+              placeholder="Buscar por nombre, DNI, RUC, teléfono o razón social..."
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-black focus:bg-white focus:ring-2 focus:ring-black/5"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={cargarClientes}
+            disabled={cargando}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+          >
+            <RefreshCw
+              size={16}
+              className={
+                cargando
+                  ? "animate-spin"
+                  : ""
+              }
+            />
+            Actualizar
+          </button>
         </div>
-      )}
-
-      {mensajeError && (
-        <div className="flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          <AlertCircle
-            size={18}
-            className="mt-0.5 shrink-0"
-          />
-
-          <span>{mensajeError}</span>
-        </div>
-      )}
-
-      {/* ======================================================
-          BUSCADOR
-          ====================================================== */}
-
-      <div className="relative">
-        <Search
-          size={18}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-criss"
-        />
-
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) =>
-            setBusqueda(e.target.value)
-          }
-          placeholder="Buscar por nombre, apellido, DNI o celular..."
-          className="w-full rounded-xl border border-carbon-2 bg-carbon-1 py-3 pl-11 pr-4 font-body text-sm text-blanco outline-none transition placeholder:text-criss focus:border-blanco"
-        />
       </div>
 
-      {/* ======================================================
-          CONTADOR
-          ====================================================== */}
-
-      <div className="flex items-center justify-between">
-        <p className="font-body text-xs text-criss">
-          {clientesFiltrados.length}{" "}
-          {clientesFiltrados.length === 1
-            ? "cliente"
-            : "clientes"}
-        </p>
-      </div>
-
-      {/* ======================================================
-          LISTA
-          ====================================================== */}
+      {/* ========================================================= */}
+      {/* LISTADO */}
+      {/* ========================================================= */}
 
       {cargando ? (
-        <div className="flex min-h-60 items-center justify-center rounded-2xl border border-carbon-2 bg-carbon-1">
-          <div className="flex flex-col items-center gap-3 text-criss">
+        <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-gray-200 bg-white">
+          <div className="flex flex-col items-center gap-3 text-gray-500">
             <Loader2
               size={28}
               className="animate-spin"
             />
 
-            <span className="font-body text-sm">
+            <span className="text-sm">
               Cargando clientes...
             </span>
           </div>
         </div>
       ) : clientesFiltrados.length === 0 ? (
-        <div className="flex min-h-60 flex-col items-center justify-center rounded-2xl border border-carbon-2 bg-carbon-1 px-6 text-center">
-          <UserRound
-            size={38}
-            className="text-criss"
-          />
+        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white px-6 text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+            <Users
+              size={22}
+              className="text-gray-500"
+            />
+          </div>
 
-          <h3 className="mt-4 font-display text-lg text-blanco">
+          <h3 className="font-semibold text-gray-900">
             No hay clientes
           </h3>
 
-          <p className="mt-1 max-w-md font-body text-sm text-criss">
+          <p className="mt-1 max-w-md text-sm text-gray-500">
             {busqueda
               ? "No encontramos clientes que coincidan con tu búsqueda."
-              : "Todavía no hay clientes registrados."}
+              : "Todavía no tienes clientes registrados."}
           </p>
+
+          {!busqueda && (
+            <button
+              type="button"
+              onClick={abrirCrear}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-semibold text-white"
+            >
+              <Plus size={17} />
+              Registrar cliente
+            </button>
+          )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-carbon-2 bg-carbon-1">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] border-collapse">
-              <thead>
-                <tr className="border-b border-carbon-2 text-left">
-                  <th className="px-5 py-4 font-body text-xs font-semibold uppercase tracking-wide text-criss">
-                    Cliente
-                  </th>
+        <>
+          {/* ===================================================== */}
+          {/* MOBILE */}
+          {/* ===================================================== */}
 
-                  <th className="px-5 py-4 font-body text-xs font-semibold uppercase tracking-wide text-criss">
-                    DNI
-                  </th>
+          <div className="grid gap-3 md:hidden">
+            {clientesFiltrados.map((cliente) => {
+              const esRuc =
+                cliente.tipo_documento === "RUC";
 
-                  <th className="px-5 py-4 font-body text-xs font-semibold uppercase tracking-wide text-criss">
-                    Celular
-                  </th>
+              const titulo = esRuc
+                ? cliente.razon_social ||
+                  cliente.nombre_comercial ||
+                  "Empresa"
+                : cliente.nombre_completo ||
+                  [
+                    cliente.nombre,
+                    cliente.apellido,
+                  ]
+                    .filter(Boolean)
+                    .join(" ") ||
+                  "Cliente";
 
-                  <th className="px-5 py-4 font-body text-xs font-semibold uppercase tracking-wide text-criss">
-                    Fecha nacimiento
-                  </th>
+              const documento = esRuc
+                ? cliente.ruc
+                : cliente.dni;
 
-                  <th className="px-5 py-4 text-right font-body text-xs font-semibold uppercase tracking-wide text-criss">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
+              return (
+                <div
+                  key={cliente.id}
+                  className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100">
+                        {esRuc ? (
+                          <Building2
+                            size={18}
+                            className="text-gray-600"
+                          />
+                        ) : (
+                          <User
+                            size={18}
+                            className="text-gray-600"
+                          />
+                        )}
+                      </div>
 
-              <tbody>
-                {clientesFiltrados.map(
-                  (cliente) => (
-                    <tr
-                      key={cliente.id}
-                      className="border-b border-carbon-2 last:border-b-0"
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-gray-900">
+                          {titulo}
+                        </p>
+
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          {esRuc
+                            ? "RUC"
+                            : "DNI"}{" "}
+                          · {documento || "-"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        abrirEditar(cliente)
+                      }
+                      className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-black"
                     >
-                      {/* Cliente */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blanco text-negro">
-                            <UserRound
-                              size={18}
-                            />
-                          </div>
+                      <Pencil size={17} />
+                    </button>
+                  </div>
 
-                          <div className="min-w-0">
-                            <p className="truncate font-body text-sm font-semibold text-blanco">
-                              {cliente.nombre_completo ||
-                                `${cliente.nombre} ${cliente.apellido}`}
-                            </p>
+                  <div className="mt-4 grid gap-2 text-sm">
+                    {cliente.celular && (
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <Phone size={15} />
+                        <span>
+                          {cliente.celular}
+                        </span>
+                      </div>
+                    )}
 
-                            {cliente.direccion && (
-                              <p className="mt-0.5 max-w-xs truncate font-body text-xs text-criss">
-                                {cliente.direccion}
-                              </p>
-                            )}
-                          </div>
+                    {cliente.direccion && (
+                      <div className="flex items-start gap-2 text-gray-600">
+                        <MapPin
+                          size={15}
+                          className="mt-0.5 shrink-0"
+                        />
+                        <span>
+                          {cliente.direccion}
+                        </span>
+                      </div>
+                    )}
+
+                    {esRuc &&
+                      cliente.estado_ruc && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">
+                            Estado:
+                          </span>
+
+                          <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
+                            {cliente.estado_ruc}
+                          </span>
                         </div>
-                      </td>
-
-                      {/* DNI */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2 font-body text-sm text-blanco">
-                          <IdCard
-                            size={16}
-                            className="text-criss"
-                          />
-
-                          {cliente.dni || "—"}
-                        </div>
-                      </td>
-
-                      {/* Celular */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2 font-body text-sm text-blanco">
-                          <Phone
-                            size={16}
-                            className="text-criss"
-                          />
-
-                          {cliente.celular || "—"}
-                        </div>
-                      </td>
-
-                      {/* Fecha */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2 font-body text-sm text-blanco">
-                          <CalendarDays
-                            size={16}
-                            className="text-criss"
-                          />
-
-                          {mostrarFecha(
-                            cliente.fecha_nacimiento
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Acciones */}
-                      <td className="px-5 py-4">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              abrirEditar(
-                                cliente
-                              )
-                            }
-                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-carbon-2 text-criss transition hover:border-blanco hover:text-blanco"
-                            title="Editar cliente"
-                          >
-                            <Pencil
-                              size={16}
-                            />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void eliminar(
-                                cliente
-                              )
-                            }
-                            disabled={eliminando}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-500/20 text-red-400 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-                            title="Eliminar cliente"
-                          >
-                            {eliminando ? (
-                              <Loader2
-                                size={16}
-                                className="animate-spin"
-                              />
-                            ) : (
-                              <Trash2
-                                size={16}
-                              />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                )}
-              </tbody>
-            </table>
+                      )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+
+          {/* ===================================================== */}
+          {/* DESKTOP */}
+          {/* ===================================================== */}
+
+          <div className="hidden overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[850px] text-left">
+                <thead className="border-b border-gray-200 bg-gray-50">
+                  <tr>
+                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Cliente
+                    </th>
+
+                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Documento
+                    </th>
+
+                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Teléfono
+                    </th>
+
+                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Dirección
+                    </th>
+
+                    <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Acción
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-gray-100">
+                  {clientesFiltrados.map(
+                    (cliente) => {
+                      const esRuc =
+                        cliente.tipo_documento ===
+                        "RUC";
+
+                      const titulo = esRuc
+                        ? cliente.razon_social ||
+                          cliente.nombre_comercial ||
+                          "Empresa"
+                        : cliente.nombre_completo ||
+                          [
+                            cliente.nombre,
+                            cliente.apellido,
+                          ]
+                            .filter(Boolean)
+                            .join(" ") ||
+                          "Cliente";
+
+                      return (
+                        <tr
+                          key={cliente.id}
+                          className="transition hover:bg-gray-50"
+                        >
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100">
+                                {esRuc ? (
+                                  <Building2
+                                    size={17}
+                                    className="text-gray-600"
+                                  />
+                                ) : (
+                                  <User
+                                    size={17}
+                                    className="text-gray-600"
+                                  />
+                                )}
+                              </div>
+
+                              <div>
+                                <p className="font-medium text-gray-900">
+                                  {titulo}
+                                </p>
+
+                                {esRuc &&
+                                  cliente.nombre_comercial && (
+                                    <p className="text-xs text-gray-500">
+                                      {
+                                        cliente.nombre_comercial
+                                      }
+                                    </p>
+                                  )}
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-2">
+                              <FileText
+                                size={15}
+                                className="text-gray-400"
+                              />
+
+                              <span className="text-sm text-gray-700">
+                                {esRuc
+                                  ? cliente.ruc ||
+                                    "-"
+                                  : cliente.dni ||
+                                    "-"}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span className="text-sm text-gray-600">
+                              {cliente.celular ||
+                                "-"}
+                            </span>
+                          </td>
+
+                          <td className="max-w-[300px] px-5 py-4">
+                            <span className="line-clamp-2 text-sm text-gray-600">
+                              {cliente.direccion ||
+                                "-"}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                abrirEditar(
+                                  cliente
+                                )
+                              }
+                              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 hover:text-black"
+                            >
+                              <Pencil size={15} />
+                              Editar
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* ======================================================
-          MODAL
-          ====================================================== */}
+      {/* ========================================================= */}
+      {/* MODAL */}
+      {/* ========================================================= */}
 
       {modalAbierto && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-negro/80 px-4 py-6 backdrop-blur-sm">
-          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-carbon-2 bg-carbon-1 shadow-2xl">
-            {/* Header */}
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-carbon-2 bg-carbon-1 px-5 py-4 sm:px-6">
-              <div>
-                <h3 className="font-display text-xl text-blanco">
-                  {modoModal === "crear"
-                    ? "Nuevo cliente"
-                    : "Editar cliente"}
-                </h3>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-6">
+          <div className="flex max-h-[95vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {/* HEADER */}
 
-                <p className="mt-1 font-body text-xs text-criss">
-                  {modoModal === "crear"
-                    ? "Busca el DNI para completar automáticamente los datos."
-                    : "Actualiza los datos del cliente."}
+            <div className="flex shrink-0 items-start justify-between border-b border-gray-200 px-5 py-4 sm:px-6">
+              <div>
+                <div className="flex items-center gap-2">
+                  {formulario.tipoDocumento ===
+                  "RUC" ? (
+                    <Building2
+                      size={20}
+                      className="text-gray-700"
+                    />
+                  ) : (
+                    <User
+                      size={20}
+                      className="text-gray-700"
+                    />
+                  )}
+
+                  <h2 className="text-lg font-semibold text-gray-950">
+                    {modoEdicion
+                      ? "Editar cliente"
+                      : "Nuevo cliente"}
+                  </h2>
+                </div>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  Busca primero en tu base de datos.
+                  La API externa solo se consulta si
+                  el cliente no existe.
                 </p>
               </div>
 
@@ -1040,376 +1481,1022 @@ export function ClientesTab() {
                 onClick={cerrarModal}
                 disabled={
                   guardando ||
-                  buscandoDni ||
+                  buscando ||
                   eliminando
                 }
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-criss transition hover:bg-carbon-2 hover:text-blanco disabled:opacity-50"
+                className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Contenido */}
-            <div className="space-y-6 px-5 py-6 sm:px-6">
-              {/* ==================================================
-                  DNI
-                  ================================================== */}
+            {/* CONTENIDO */}
 
-              <div>
-                <label className="mb-2 block font-body text-sm font-medium text-blanco">
-                  DNI
-                </label>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="space-y-6 p-5 sm:p-6">
+                {/* MENSAJES */}
 
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <div className="relative flex-1">
-                    <IdCard
+                {mensajeExito && (
+                  <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-3.5 text-sm text-green-800">
+                    <CheckCircle2
                       size={18}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-criss"
+                      className="mt-0.5 shrink-0"
                     />
 
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={8}
-                      value={dni}
-                      onChange={(e) => {
-                        const valor =
-                          e.target.value.replace(
-                            /\D/g,
-                            ""
-                          );
+                    <span>
+                      {mensajeExito}
+                    </span>
+                  </div>
+                )}
 
-                        setDni(valor);
-
-                        /*
-                         * Si el usuario modifica el DNI,
-                         * ya no podemos asegurar que el cliente
-                         * encontrado anteriormente corresponde
-                         * al nuevo DNI.
-                         */
-                        setClienteYaRegistrado(
-                          false
-                        );
-
-                        limpiarMensajes();
-                      }}
-                      placeholder="12345678"
-                      className="w-full rounded-xl border border-carbon-2 bg-negro py-3 pl-10 pr-4 font-body text-sm text-blanco outline-none transition placeholder:text-criss focus:border-blanco"
+                {mensajeError && (
+                  <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm text-red-800">
+                    <AlertCircle
+                      size={18}
+                      className="mt-0.5 shrink-0"
                     />
+
+                    <span>
+                      {mensajeError}
+                    </span>
+                  </div>
+                )}
+
+                {/* ================================================= */}
+                {/* IDENTIFICACIÓN */}
+                {/* ================================================= */}
+
+                <section>
+                  <div className="mb-4 flex items-center gap-2">
+                    <FileText
+                      size={18}
+                      className="text-gray-700"
+                    />
+
+                    <h3 className="font-semibold text-gray-900">
+                      Identificación
+                    </h3>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void buscarPorDni()
-                    }
-                    disabled={
-                      buscandoDni ||
-                      dni.length !== 8
-                    }
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-blanco px-5 py-3 font-body text-sm font-semibold text-negro transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {buscandoDni ? (
-                      <>
-                        <Loader2
-                          size={17}
-                          className="animate-spin"
-                        />
+                  <div className="grid gap-4 md:grid-cols-[180px_1fr_auto]">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-medium text-gray-600">
+                        Documento
+                      </label>
 
-                        Buscando...
-                      </>
-                    ) : (
-                      <>
-                        <Search size={17} />
-                        Buscar DNI
-                      </>
-                    )}
-                  </button>
-                </div>
+                      <select
+                        value={
+                          formulario.tipoDocumento
+                        }
+                        onChange={(e) =>
+                          cambiarTipoDocumento(
+                            e.target
+                              .value as TipoDocumento
+                          )
+                        }
+                        disabled={!!modoEdicion}
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-black focus:ring-2 focus:ring-black/5 disabled:cursor-not-allowed disabled:bg-gray-100"
+                      >
+                        <option value="DNI">
+                          DNI
+                        </option>
 
-                {clienteYaRegistrado &&
-                  modoModal === "crear" && (
-                    <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-300">
-                      <CheckCircle2
-                        size={16}
-                        className="mt-0.5 shrink-0"
+                        <option value="RUC">
+                          RUC
+                        </option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-medium text-gray-600">
+                        Número de{" "}
+                        {formulario.tipoDocumento}
+                      </label>
+
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={
+                          formulario.tipoDocumento ===
+                          "DNI"
+                            ? 8
+                            : 11
+                        }
+                        value={
+                          formulario.numeroDoc
+                        }
+                        onChange={(e) =>
+                          actualizarCampo(
+                            "numeroDoc",
+                            e.target.value.replace(
+                              /\D/g,
+                              ""
+                            )
+                          )
+                        }
+                        disabled={!!modoEdicion}
+                        placeholder={
+                          formulario.tipoDocumento ===
+                          "DNI"
+                            ? "Ej. 72465854"
+                            : "Ej. 20538763072"
+                        }
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-black focus:ring-2 focus:ring-black/5 disabled:cursor-not-allowed disabled:bg-gray-100"
                       />
 
-                      <span>
-                        Este DNI ya está registrado en
-                        la base de datos. No se puede
-                        crear nuevamente.
-                      </span>
+                      {modoEdicion && (
+                        <p className="text-[11px] text-gray-500">
+                          El documento no se puede
+                          cambiar durante la edición.
+                        </p>
+                      )}
                     </div>
-                  )}
-              </div>
 
-              {/* ==================================================
-                  DATOS PERSONALES
-                  ================================================== */}
-
-              <div className="grid gap-5 sm:grid-cols-2">
-                {/* Nombre */}
-                <div>
-                  <label className="mb-2 block font-body text-sm font-medium text-blanco">
-                    Nombres *
-                  </label>
-
-                  <div className="relative">
-                    <UserRound
-                      size={17}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-criss"
-                    />
-
-                    <input
-                      type="text"
-                      value={nombre}
-                      onChange={(e) =>
-                        setNombre(
-                          e.target.value
-                        )
-                      }
-                      placeholder="Nombres"
-                      className="w-full rounded-xl border border-carbon-2 bg-negro py-3 pl-10 pr-4 font-body text-sm text-blanco outline-none transition placeholder:text-criss focus:border-blanco"
-                    />
+                    <div className="flex items-end">
+                      {!modoEdicion && (
+                        <button
+                          type="button"
+                          onClick={buscar}
+                          disabled={buscando}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
+                        >
+                          {buscando ? (
+                            <>
+                              <Loader2
+                                size={16}
+                                className="animate-spin"
+                              />
+                              Buscando...
+                            </>
+                          ) : (
+                            <>
+                              <Search
+                                size={16}
+                              />
+                              Buscar
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
+                </section>
 
-                {/* Apellido */}
-                <div>
-                  <label className="mb-2 block font-body text-sm font-medium text-blanco">
-                    Apellidos *
-                  </label>
+                {/* ================================================= */}
+                {/* DATOS DNI */}
+                {/* ================================================= */}
 
-                  <input
-                    type="text"
-                    value={apellido}
-                    onChange={(e) =>
-                      setApellido(
-                        e.target.value
-                      )
-                    }
-                    placeholder="Apellidos"
-                    className="w-full rounded-xl border border-carbon-2 bg-negro px-4 py-3 font-body text-sm text-blanco outline-none transition placeholder:text-criss focus:border-blanco"
-                  />
-                </div>
+                {formulario.tipoDocumento ===
+                  "DNI" && (
+                  <section className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 sm:p-5">
+                    <div className="mb-4 flex items-center gap-2">
+                      <User
+                        size={18}
+                        className="text-gray-700"
+                      />
 
-                {/* Apellido paterno */}
-                <div>
-                  <label className="mb-2 block font-body text-sm font-medium text-blanco">
-                    Apellido paterno
-                  </label>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">
+                          Datos personales
+                        </h3>
 
-                  <input
-                    type="text"
-                    value={apellidoPaterno}
-                    onChange={(e) =>
-                      setApellidoPaterno(
-                        e.target.value
-                      )
-                    }
-                    placeholder="Apellido paterno"
-                    className="w-full rounded-xl border border-carbon-2 bg-negro px-4 py-3 font-body text-sm text-blanco outline-none transition placeholder:text-criss focus:border-blanco"
-                  />
-                </div>
+                        <p className="text-xs text-gray-500">
+                          Información obtenida del DNI.
+                        </p>
+                      </div>
+                    </div>
 
-                {/* Apellido materno */}
-                <div>
-                  <label className="mb-2 block font-body text-sm font-medium text-blanco">
-                    Apellido materno
-                  </label>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Campo
+                        label="Nombres"
+                        value={
+                          formulario.nombre
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "nombre",
+                            value
+                          )
+                        }
+                      />
 
-                  <input
-                    type="text"
-                    value={apellidoMaterno}
-                    onChange={(e) =>
-                      setApellidoMaterno(
-                        e.target.value
-                      )
-                    }
-                    placeholder="Apellido materno"
-                    className="w-full rounded-xl border border-carbon-2 bg-negro px-4 py-3 font-body text-sm text-blanco outline-none transition placeholder:text-criss focus:border-blanco"
-                  />
-                </div>
+                      <Campo
+                        label="Nombre completo"
+                        value={
+                          formulario.nombreCompleto
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "nombreCompleto",
+                            value
+                          )
+                        }
+                      />
 
-                {/* Nombre completo */}
-                <div className="sm:col-span-2">
-                  <label className="mb-2 block font-body text-sm font-medium text-blanco">
-                    Nombre completo
-                  </label>
+                      <Campo
+                        label="Apellido paterno"
+                        value={
+                          formulario.apellidoPaterno
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "apellidoPaterno",
+                            value
+                          )
+                        }
+                      />
 
-                  <input
-                    type="text"
-                    value={nombreCompleto}
-                    onChange={(e) =>
-                      setNombreCompleto(
-                        e.target.value
-                      )
-                    }
-                    placeholder="Nombre completo"
-                    className="w-full rounded-xl border border-carbon-2 bg-negro px-4 py-3 font-body text-sm text-blanco outline-none transition placeholder:text-criss focus:border-blanco"
-                  />
-                </div>
+                      <Campo
+                        label="Apellido materno"
+                        value={
+                          formulario.apellidoMaterno
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "apellidoMaterno",
+                            value
+                          )
+                        }
+                      />
 
-                {/* Celular */}
-                <div>
-                  <label className="mb-2 block font-body text-sm font-medium text-blanco">
-                    Celular
-                  </label>
+                      <Campo
+                        label="Apellido"
+                        value={
+                          formulario.apellido
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "apellido",
+                            value
+                          )
+                        }
+                      />
 
-                  <div className="relative">
-                    <Phone
-                      size={17}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-criss"
-                    />
+                      <Campo
+                        label="Fecha de nacimiento"
+                        type="date"
+                        value={
+                          formulario.fechaNacimiento
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "fechaNacimiento",
+                            value
+                          )
+                        }
+                      />
 
-                    <input
-                      type="text"
-                      inputMode="tel"
-                      value={celular}
-                      onChange={(e) =>
-                        setCelular(
-                          e.target.value
-                        )
-                      }
-                      placeholder="987654321"
-                      className="w-full rounded-xl border border-carbon-2 bg-negro py-3 pl-10 pr-4 font-body text-sm text-blanco outline-none transition placeholder:text-criss focus:border-blanco"
-                    />
-                  </div>
-                </div>
+                      <Campo
+                        label="Dígito RUC"
+                        value={
+                          formulario.digRuc
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "digRuc",
+                            value
+                          )
+                        }
+                      />
 
-                {/* Fecha nacimiento */}
-                <div>
-                  <label className="mb-2 block font-body text-sm font-medium text-blanco">
-                    Fecha de nacimiento
-                  </label>
+                      <Campo
+                        label="Sexo"
+                        value={
+                          formulario.sexo
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "sexo",
+                            value
+                          )
+                        }
+                        placeholder="Ej. 1 / 2"
+                      />
 
-                  <div className="relative">
-                    <Cake
-                      size={17}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-criss"
-                    />
+                      <Campo
+                        label="Estado civil"
+                        value={
+                          formulario.estadoCivil
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "estadoCivil",
+                            value
+                          )
+                        }
+                      />
 
-                    <input
-                      type="date"
-                      value={fechaNacimiento}
-                      onChange={(e) =>
-                        setFechaNacimiento(
-                          e.target.value
-                        )
-                      }
-                      className="w-full rounded-xl border border-carbon-2 bg-negro py-3 pl-10 pr-4 font-body text-sm text-blanco outline-none transition focus:border-blanco"
-                    />
-                  </div>
-                </div>
+                      <Campo
+                        label="Ubigeo de nacimiento"
+                        value={
+                          formulario.ubigeoNacimiento
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "ubigeoNacimiento",
+                            value
+                          )
+                        }
+                      />
 
-                {/* Dirección */}
-                <div className="sm:col-span-2">
-                  <label className="mb-2 block font-body text-sm font-medium text-blanco">
-                    Dirección
-                  </label>
+                      <Campo
+                        label="Ubigeo de dirección"
+                        value={
+                          formulario.ubigeoDireccion
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "ubigeoDireccion",
+                            value
+                          )
+                        }
+                      />
 
-                  <div className="relative">
-                    <MapPin
-                      size={17}
-                      className="absolute left-3 top-3 text-criss"
-                    />
+                      <Campo
+                        label="Celular"
+                        value={
+                          formulario.celular
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "celular",
+                            value
+                          )
+                        }
+                        placeholder="Ej. 999999999"
+                      />
 
-                    <textarea
-                      value={direccion}
-                      onChange={(e) =>
-                        setDireccion(
-                          e.target.value
-                        )
-                      }
-                      placeholder="Dirección"
-                      rows={3}
-                      className="w-full resize-none rounded-xl border border-carbon-2 bg-negro py-3 pl-10 pr-4 font-body text-sm text-blanco outline-none transition placeholder:text-criss focus:border-blanco"
-                    />
-                  </div>
-                </div>
+                      <Campo
+                        label="Madre"
+                        value={
+                          formulario.madre
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "madre",
+                            value
+                          )
+                        }
+                      />
 
-                {/* Ubigeo */}
-                <div>
-                  <label className="mb-2 block font-body text-sm font-medium text-blanco">
-                    Ubigeo
-                  </label>
+                      <Campo
+                        label="Padre"
+                        value={
+                          formulario.padre
+                        }
+                        onChange={(value) =>
+                          actualizarCampo(
+                            "padre",
+                            value
+                          )
+                        }
+                      />
 
-                  <input
-                    type="text"
-                    value={ubigeo}
-                    onChange={(e) =>
-                      setUbigeo(
-                        e.target.value
-                      )
-                    }
-                    placeholder="Ubigeo"
-                    className="w-full rounded-xl border border-carbon-2 bg-negro px-4 py-3 font-body text-sm text-blanco outline-none transition placeholder:text-criss focus:border-blanco"
-                  />
-                </div>
+                      <div className="md:col-span-2">
+                        <CampoGrande
+                          label="Dirección"
+                          value={
+                            formulario.direccion
+                          }
+                          onChange={(value) =>
+                            actualizarCampo(
+                              "direccion",
+                              value
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {/* ================================================= */}
+                {/* DATOS RUC */}
+                {/* ================================================= */}
+
+                {formulario.tipoDocumento ===
+                  "RUC" && (
+                  <>
+                    <section className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 sm:p-5">
+                      <div className="mb-4 flex items-center gap-2">
+                        <Building2
+                          size={18}
+                          className="text-gray-700"
+                        />
+
+                        <div>
+                          <h3 className="font-semibold text-gray-900">
+                            Datos de la empresa
+                          </h3>
+
+                          <p className="text-xs text-gray-500">
+                            Información obtenida del
+                            RUC.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <Campo
+                          label="Razón social"
+                          value={
+                            formulario.razonSocial
+                          }
+                          onChange={(value) =>
+                            actualizarCampo(
+                              "razonSocial",
+                              value
+                            )
+                          }
+                        />
+
+                        <Campo
+                          label="Nombre comercial"
+                          value={
+                            formulario.nombreComercial
+                          }
+                          onChange={(value) =>
+                            actualizarCampo(
+                              "nombreComercial",
+                              value
+                            )
+                          }
+                        />
+
+                        <Campo
+                          label="Tipo de contribuyente"
+                          value={
+                            formulario.tipoContribuyente
+                          }
+                          onChange={(value) =>
+                            actualizarCampo(
+                              "tipoContribuyente",
+                              value
+                            )
+                          }
+                        />
+
+                        <Campo
+                          label="Estado RUC"
+                          value={
+                            formulario.estadoRuc
+                          }
+                          onChange={(value) =>
+                            actualizarCampo(
+                              "estadoRuc",
+                              value
+                            )
+                          }
+                        />
+
+                        <Campo
+                          label="Condición RUC"
+                          value={
+                            formulario.condicionRuc
+                          }
+                          onChange={(value) =>
+                            actualizarCampo(
+                              "condicionRuc",
+                              value
+                            )
+                          }
+                        />
+
+                        <Campo
+                          label="Fecha de inscripción"
+                          value={
+                            formulario.fechaInscripcion
+                          }
+                          onChange={(value) =>
+                            actualizarCampo(
+                              "fechaInscripcion",
+                              value
+                            )
+                          }
+                        />
+
+                        <Campo
+                          label="Sistema de contabilidad"
+                          value={
+                            formulario.sistemaContabilidad
+                          }
+                          onChange={(value) =>
+                            actualizarCampo(
+                              "sistemaContabilidad",
+                              value
+                            )
+                          }
+                        />
+
+                        <Campo
+                          label="Afiliado PLE"
+                          value={
+                            formulario.afiliadoPle
+                          }
+                          onChange={(value) =>
+                            actualizarCampo(
+                              "afiliadoPle",
+                              value
+                            )
+                          }
+                        />
+
+                        <Campo
+                          label="Emisor electrónico"
+                          value={
+                            formulario.emisorElectronico
+                          }
+                          onChange={(value) =>
+                            actualizarCampo(
+                              "emisorElectronico",
+                              value
+                            )
+                          }
+                        />
+
+                        <div className="md:col-span-2">
+                          <CampoGrande
+                            label="Actividad económica"
+                            value={
+                              formulario.actividadEconomica
+                            }
+                            onChange={(value) =>
+                              actualizarCampo(
+                                "actividadEconomica",
+                                value
+                              )
+                            }
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <CampoGrande
+                            label="Comprobantes electrónicos"
+                            value={
+                              formulario.comprobantesElectronicos
+                            }
+                            onChange={(value) =>
+                              actualizarCampo(
+                                "comprobantesElectronicos",
+                                value
+                              )
+                            }
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <CampoGrande
+                            label="Padrones"
+                            value={
+                              formulario.padrones
+                            }
+                            onChange={(value) =>
+                              actualizarCampo(
+                                "padrones",
+                                value
+                              )
+                            }
+                            rows={4}
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <CampoGrande
+                            label="Domicilio fiscal"
+                            value={
+                              formulario.direccion
+                            }
+                            onChange={(value) =>
+                              actualizarCampo(
+                                "direccion",
+                                value
+                              )
+                            }
+                            rows={3}
+                          />
+                        </div>
+
+                        <Campo
+                          label="Celular / contacto"
+                          value={
+                            formulario.celular
+                          }
+                          onChange={(value) =>
+                            actualizarCampo(
+                              "celular",
+                              value
+                            )
+                          }
+                          placeholder="Ej. 999999999"
+                        />
+                      </div>
+                    </section>
+
+                    {/* ============================================= */}
+                    {/* TRABAJADORES */}
+                    {/* ============================================= */}
+
+                    <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
+                      <div className="mb-4 flex items-center gap-2">
+                        <BriefcaseBusiness
+                          size={18}
+                          className="text-gray-700"
+                        />
+
+                        <div>
+                          <h3 className="font-semibold text-gray-900">
+                            Trabajadores
+                          </h3>
+
+                          <p className="text-xs text-gray-500">
+                            Información histórica reportada
+                            para el RUC.
+                          </p>
+                        </div>
+                      </div>
+
+                      {formulario
+                        .cantTrabajadores
+                        .length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-5 text-center text-sm text-gray-500">
+                          No hay información de
+                          trabajadores.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-gray-200">
+                          <table className="w-full min-w-[650px] text-left text-sm">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-500">
+                                  Periodo
+                                </th>
+
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-500">
+                                  Pensionistas
+                                </th>
+
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-500">
+                                  Prestadores
+                                </th>
+
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-500">
+                                  Trabajadores
+                                </th>
+                              </tr>
+                            </thead>
+
+                            <tbody className="divide-y divide-gray-100">
+                              {formulario.cantTrabajadores.map(
+                                (
+                                  trabajador,
+                                  index
+                                ) => (
+                                  <tr
+                                    key={`${trabajador.periodo}-${index}`}
+                                  >
+                                    <td className="px-4 py-3 font-medium text-gray-900">
+                                      {
+                                        trabajador.periodo
+                                      }
+                                    </td>
+
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {
+                                        trabajador.numPensionista
+                                      }
+                                    </td>
+
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {
+                                        trabajador.numPrestadoresServicio
+                                      }
+                                    </td>
+
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {
+                                        trabajador.numTrabajadores
+                                      }
+                                    </td>
+                                  </tr>
+                                )
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </section>
+
+                    {/* ============================================= */}
+                    {/* REPRESENTANTES */}
+                    {/* ============================================= */}
+
+                    <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
+                      <div className="mb-4 flex items-center gap-2">
+                        <Users
+                          size={18}
+                          className="text-gray-700"
+                        />
+
+                        <div>
+                          <h3 className="font-semibold text-gray-900">
+                            Representantes
+                          </h3>
+
+                          <p className="text-xs text-gray-500">
+                            Representantes registrados
+                            para la empresa.
+                          </p>
+                        </div>
+                      </div>
+
+                      {formulario
+                        .representantes
+                        .length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-5 text-center text-sm text-gray-500">
+                          No hay representantes
+                          registrados.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-gray-200">
+                          <table className="w-full min-w-[850px] text-left text-sm">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-500">
+                                  Cargo
+                                </th>
+
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-500">
+                                  Nombre
+                                </th>
+
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-500">
+                                  Documento
+                                </th>
+
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-500">
+                                  Tipo
+                                </th>
+
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-500">
+                                  Desde
+                                </th>
+                              </tr>
+                            </thead>
+
+                            <tbody className="divide-y divide-gray-100">
+                              {formulario.representantes.map(
+                                (
+                                  representante,
+                                  index
+                                ) => (
+                                  <tr
+                                    key={`${representante.numDocumento}-${index}`}
+                                  >
+                                    <td className="px-4 py-3 font-medium text-gray-900">
+                                      {
+                                        representante.cargo
+                                      }
+                                    </td>
+
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {
+                                        representante.nombre
+                                      }
+                                    </td>
+
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {
+                                        representante.numDocumento
+                                      }
+                                    </td>
+
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {
+                                        representante.tipDocumento
+                                      }
+                                    </td>
+
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {formatearFecha(
+                                        representante.fechaDesde
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </section>
+
+                    {/* ============================================= */}
+                    {/* HISTÓRICO */}
+                    {/* ============================================= */}
+
+                    <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
+                      <div className="mb-4 flex items-center gap-2">
+                        <History
+                          size={18}
+                          className="text-gray-700"
+                        />
+
+                        <div>
+                          <h3 className="font-semibold text-gray-900">
+                            Histórico
+                          </h3>
+
+                          <p className="text-xs text-gray-500">
+                            Información histórica asociada
+                            al RUC.
+                          </p>
+                        </div>
+                      </div>
+
+                      {!formulario.historico ||
+                      formulario.historico.bajas
+                        .length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-5 text-center text-sm text-gray-500">
+                          No hay bajas históricas
+                          registradas.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-gray-200">
+                          <table className="w-full min-w-[700px] text-left text-sm">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-500">
+                                  Fecha de baja
+                                </th>
+
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-500">
+                                  Razón social histórica
+                                </th>
+                              </tr>
+                            </thead>
+
+                            <tbody className="divide-y divide-gray-100">
+                              {formulario.historico.bajas.map(
+                                (
+                                  baja,
+                                  index
+                                ) => (
+                                  <tr
+                                    key={`${baja.fechaBaja}-${index}`}
+                                  >
+                                    <td className="px-4 py-3 font-medium text-gray-900">
+                                      {formatearFecha(
+                                        baja.fechaBaja
+                                      )}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {
+                                        baja.razonSocial
+                                      }
+                                    </td>
+                                  </tr>
+                                )
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </section>
+                  </>
+                )}
+
+                {/* ================================================= */}
+                {/* ELIMINAR */}
+                {/* ================================================= */}
+
+                {modoEdicion && (
+                  <section className="rounded-xl border border-red-200 bg-red-50 p-4">
+                    {!confirmarEliminar ? (
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-red-900">
+                            Eliminar cliente
+                          </p>
+
+                          <p className="mt-1 text-xs text-red-700">
+                            Esta acción eliminará el registro
+                            del cliente.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setConfirmarEliminar(
+                              true
+                            )
+                          }
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100"
+                        >
+                          <Trash2 size={15} />
+                          Eliminar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-red-900">
+                            ¿Confirmar eliminación?
+                          </p>
+
+                          <p className="mt-1 text-xs text-red-700">
+                            Esta acción no se puede
+                            deshacer.
+                          </p>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setConfirmarEliminar(
+                                false
+                              )
+                            }
+                            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            Cancelar
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={eliminar}
+                            disabled={
+                              eliminando
+                            }
+                            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                          >
+                            {eliminando ? (
+                              <>
+                                <Loader2
+                                  size={15}
+                                  className="animate-spin"
+                                />
+                                Eliminando...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2
+                                  size={15}
+                                />
+                                Sí, eliminar
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                )}
               </div>
             </div>
 
-            {/* ==================================================
-                FOOTER
-                ================================================== */}
+            {/* FOOTER */}
 
-            <div className="sticky bottom-0 flex flex-col-reverse gap-3 border-t border-carbon-2 bg-carbon-1 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+            <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-6">
               <button
                 type="button"
                 onClick={cerrarModal}
                 disabled={
                   guardando ||
-                  buscandoDni
+                  buscando ||
+                  eliminando
                 }
-                className="rounded-xl border border-carbon-2 px-5 py-3 font-body text-sm font-medium text-criss transition hover:bg-carbon-2 hover:text-blanco disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancelar
               </button>
 
               <button
                 type="button"
-                onClick={() =>
-                  void guardar()
-                }
+                onClick={guardar}
                 disabled={
                   guardando ||
-                  buscandoDni ||
-                  (modoModal === "crear" &&
-                    clienteYaRegistrado)
+                  buscando ||
+                  eliminando
                 }
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blanco px-5 py-3 font-body text-sm font-semibold text-negro transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-black px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {guardando ? (
                   <>
                     <Loader2
-                      size={17}
+                      size={16}
                       className="animate-spin"
                     />
-
                     Guardando...
-                  </>
-                ) : clienteYaRegistrado &&
-                  modoModal === "crear" ? (
-                  <>
-                    <CheckCircle2
-                      size={17}
-                    />
-
-                    Cliente ya registrado
-                  </>
-                ) : modoModal ===
-                  "crear" ? (
-                  <>
-                    <Plus size={17} />
-
-                    Guardar cliente
                   </>
                 ) : (
                   <>
-                    <Pencil size={17} />
-
-                    Guardar cambios
+                    <CheckCircle2 size={16} />
+                    {modoEdicion
+                      ? "Guardar cambios"
+                      : "Registrar cliente"}
                   </>
                 )}
               </button>
@@ -1417,6 +2504,6 @@ export function ClientesTab() {
           </div>
         </div>
       )}
-    </section>
+    </div>
   );
 }
