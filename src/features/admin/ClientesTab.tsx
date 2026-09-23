@@ -35,8 +35,6 @@ import {
   fetchClientes,
   type ClienteDB,
   type DatosClienteFormulario,
-  type DatosDNI,
-  type DatosRUC,
   type TipoDocumento as TipoDocumentoAPI,
 } from "../../lib/adminApi";
 
@@ -81,7 +79,7 @@ interface BajaHistoricaRUC {
 }
 
 interface HistoricoRUC {
-  condiciones: unknown[];
+  condiciones: Record<string, unknown>[];
   bajas: BajaHistoricaRUC[];
 }
 
@@ -250,7 +248,9 @@ function normalizarHistorico(valor: unknown): HistoricoRUC | null {
   const data = valor as any;
 
   return {
-    condiciones: Array.isArray(data.condiciones) ? data.condiciones : [],
+    condiciones: Array.isArray(data.condiciones)
+      ? (data.condiciones as Record<string, unknown>[])
+      : [],
     bajas: Array.isArray(data.bajas)
       ? data.bajas.map((item: any) => ({
           fechaBaja: textoSeguro(item?.fechaBaja),
